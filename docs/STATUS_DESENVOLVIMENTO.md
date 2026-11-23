@@ -1,8 +1,8 @@
 # Status de Desenvolvimento — Mercado no Controle
 
 **Última atualização:** 2026-11-23
-**Fase atual:** Fase 5 — Histórico de preços ✅ concluída
-**Próxima etapa:** Fase 6 — Dashboard e relatórios
+**Fase atual:** Fase 6 — Dashboard e relatórios ✅ concluída
+**Próxima etapa:** Fase 7 — Qualidade e entrega
 **Pendência registrada:** validar a leitura real por IA com uma chave configurada (seção 7).
 
 ---
@@ -16,8 +16,8 @@
 | 3 | Compras (cadastro manual, itens, upload de imagens, duplicidade) | ✅ Concluída |
 | 4 | Inteligência artificial (`IReceiptReader`, conferência, confirmação) | ✅ Concluída |
 | 5 | Histórico de preços (registro, normalização, comparação, gráficos) | ✅ Concluída |
-| 6 | Dashboard e relatórios (indicadores, filtros, exportações) | ⏳ Próxima |
-| 7 | Qualidade e entrega (autenticação, backup, segurança, publicação) | Pendente |
+| 6 | Dashboard e relatórios (indicadores, filtros, exportações) | ✅ Concluída |
+| 7 | Qualidade e entrega (autenticação, backup, segurança, publicação) | ⏳ Próxima |
 
 ## 2. Ambiente verificado
 
@@ -147,13 +147,43 @@
 - **Detalhes do produto**: resumo do histórico (indicadores) e link para a evolução completa.
 - Gráficos seguem as diretrizes de visualização: paleta categórica validada para daltonismo em ordem fixa, cor atrelada à loja (não ao ranking), eixo único, linhas de 2 px com marcadores ≥ 8 px, legenda quando há mais de uma série e rótulo direto até 4 séries, rótulo apenas no menor preço das barras, tooltip, descrição acessível e tabela com os mesmos dados.
 
+### Fase 6 — Dashboard e relatórios
+
+**Backend**
+- **`AnalyticsData`** — leitura única das compras confirmadas (RN09) usada pelo dashboard e pelos relatórios, para que os dois partam dos mesmos dados.
+  - Período padrão: últimos 12 meses (do 1º dia do mês até hoje). Início depois do fim → 422.
+  - Filtros: período (`from`/`to`, inclusivos), supermercado e categoria. Com filtro de categoria, o valor de cada compra é a soma dos itens da categoria (D51).
+  - Somas e médias em `decimal`; meses sem compra aparecem zerados.
+- **Dashboard** — `GET /api/dashboard`: total e quantidade de compras no período, ticket médio, maior compra (com link para a nota), supermercado com maior gasto, total do mês atual e do ano atual. Também `/monthly`, `/stores`, `/categories` e `/products?top=` (participação %).
+- **Relatórios** — `GET /api/reports/{monthly|stores|categories|products|history|comparison}` devolvem uma tabela genérica (`ReportTable`: título, texto dos filtros, notas, colunas tipadas e linhas, com linhas de total).
+  - Mensal: subtotais por ano e "Total do período" quando há mais de um ano.
+  - Por supermercado: compras, total, ticket médio e participação.
+  - Por categoria: total e participação, incluindo "Itens sem produto associado" e "Ajustes da nota" (D52).
+  - Produtos: ranking por maior gasto, mais comprados ou maior aumento de preço (preço pago na primeira e na última compra do período; mínimo de duas compras).
+  - Histórico de compras do período.
+  - Comparação entre períodos por categoria: padrão é o período imediatamente anterior, com a mesma duração.
+- **Exportações** — `GET /api/reports/export?report=&format=csv|xlsx|pdf` exporta exatamente a mesma tabela exibida na tela, com os mesmos filtros. Nome do arquivo: `mercado-no-controle-{relatório}-{aaaaMMdd}`.
+  - CSV com `;` e vírgula decimal, UTF-8 com BOM (D53).
+  - Excel (ClosedXML): título, filtros, notas, cabeçalho congelado e formatos numéricos.
+  - PDF (QuestPDF): paisagem acima de 5 colunas, rodapé com data de geração e paginação.
+
+**Frontend**
+- **Filtros compartilhados** (`AnalyticsFilters`): período pré-definido (este mês, 3/6/12 meses, este ano, ano anterior) ou personalizado; supermercado por busca; categoria; "Limpar filtros". O estado fica na URL, então links e recarregamentos preservam os filtros.
+- **Dashboard** (`/dashboard`):
+  - Indicadores, com o total do período em destaque.
+  - Gráficos: evolução mensal (colunas), distribuição por supermercado, por categoria e produtos com maior gasto (barras horizontais ordenadas), e comparativo mês anterior × mês atual por categoria (barras agrupadas com legenda).
+  - Cada gráfico tem link "Ver relatório", que abre a tabela correspondente com os mesmos filtros.
+  - Estados de vazio e de erro com nova tentativa.
+- **Relatórios** (`/reports`): seletor de relatório e de ranking, mesmos filtros, tabela formatada por tipo de coluna (moeda, %, datas pt-BR, linhas de total em negrito) e botões CSV, Excel e PDF.
+- Paleta, eixo único e rótulos seletivos seguem as mesmas regras da Fase 5. Rótulos dos eixos sem ",00" nas marcas inteiras, e marcas sobrepostas são ocultadas.
+
 ## 4. Testes executados (2026-11-23)
 
 | Suíte | Resultado |
 |---|---|
-| Backend — `dotnet test` | **227 aprovados**, 0 falhas |
-| Frontend — `ng test` (Vitest) | **146 aprovados**, 0 falhas |
-| Build de produção Angular | OK (inicial ≈ 802 kB, ≈ 169 kB transferidos; ECharts em chunk sob demanda ≈ 160 kB) |
+| Backend — `dotnet test` | **243 aprovados**, 0 falhas |
+| Frontend — `ng test` (Vitest) | **166 aprovados**, 0 falhas |
+| Build de produção Angular | OK (inicial ≈ 802 kB, ≈ 169 kB transferidos; ECharts em chunk sob demanda ≈ 160 kB; dashboard e relatórios em chunks próprios) |
 | Verificação manual no navegador | Ver abaixo |
 | Chamada real à API da Anthropic | **Não executada** — não há chave configurada neste ambiente (seção 7) |
 
@@ -163,6 +193,15 @@
 - Fase 3: chave de acesso (formato, DV, CNPJ); consistência dos valores (todos os alertas, tolerância de truncamento, desconto geral e acréscimos); serviço de compras (rascunho sem histórico, referências inválidas, chave duplicada, confirmação exige itens, alertas exigem ciência, possíveis duplicatas sem bloqueio e só no mesmo supermercado, histórico gerado só para itens associados, descrições aprendidas, edição preservando ids e ressincronizando o histórico, associação posterior, exclusão removendo histórico, indicadores do supermercado, filtros/período/ordenação, imagem); armazenamento de imagens (assinatura, vazio, tamanho, fluxo maior que o declarado, caminho fora do diretório); endpoints (fluxo completo com 409 de alertas, erros por item, upload multipart, rejeição de arquivo falso, imagem servida com `nosniff`); datas de auditoria em UTC.
 - Fase 4 (com leitor simulado, isolado no projeto de testes): esquema da saída estruturada (objetos estritos, nomes do contrato), interpretação da resposta (decimais exatos, recusa, `max_tokens`, vazio, JSON inválido), limite de 5 MB e formato antes de chamar a API, escolha do leitor por configuração; rascunho (supermercado por CNPJ, não cadastrado, CNPJ/chave/data inválidos sem preenchimento, valores ausentes, inconsistências, total líquido do item, sugestão única × ambígua, JSON ilegível); importações (upload e fila, leitura bem-sucedida sem registrar compra, cada tipo de falha, erro inesperado sem vazar detalhes, imagem que não é nota, processamento só de pendentes, reprocessamento, confirmação transacional com imagem e vínculo, alertas sem gravação, conclusão manual após falha, estados que impedem confirmar, descarte, status do leitor); ponta a ponta HTTP (enviar → processar em segundo plano → conferir → confirmar → compra com imagem e `processing`; sem leitor configurado; arquivo falso; importação inexistente).
 - Fase 5: normalização (embalado por unidade, granel em KG/G/L/ML e variações, dúzia, pacote com conteúdo; conteúdo desconhecido, CX/PCT, unidades incompatíveis e quantidade inválida sem normalizar), preço efetivo, gravação na confirmação, recálculo restrito ao produto alterado, recálculo idempotente na inicialização, indicadores exatos (média de 3 preços, variação, menor/maior com loja e data, normalizados), filtros de período e loja, produto sem compras, período inválido, comparação por loja com diferença % e produtos comparáveis só da mesma categoria/unidade, agrupamento de itens sem produto (acentos/caixa, rascunhos excluídos, sugestão única), associação posterior com histórico e descrição alternativa; ponta a ponta HTTP (compra → histórico R$/kg → comparação → associação posterior → histórico do novo produto; 404/422/400).
+- Fase 6:
+  - Período padrão e período inválido; somente compras confirmadas.
+  - Indicadores exatos (total, ticket médio, maior compra, supermercado com maior gasto, mês e ano atuais) e meses sem compra zerados.
+  - Filtros de supermercado e de categoria (soma só dos itens da categoria).
+  - Distribuição por categoria fechando com o total, incluindo itens sem produto e ajustes da nota.
+  - Rankings de produtos (gasto, quantidade, aumento de preço) e comparação com o período anterior.
+  - Consistência: dashboard = relatório mensal = soma das compras.
+  - Exportações: CSV com BOM, `;` e vírgula decimal; Excel legível pelo ClosedXML; PDF válido.
+  - Ponta a ponta HTTP: dashboard, relatórios, exportações com cabeçalhos e nome do arquivo, 422 e 400.
 
 **Frontend — cobertura acumulada**
 - Fase 1: roteamento e títulos, `HealthService`, `toApiError`, indicador da API, layout, página provisória.
@@ -170,12 +209,26 @@
 - Fase 3: arredondamento e total do item, mapeamento de caminhos de erro, formato da chave, adaptador de datas, serviço HTTP de compras (inclusive upload), fluxo de confirmação com alertas (aceitar, recusar, outros erros), `SearchPicker` (busca, seleção, limpeza ao digitar, cadastrar novo, desabilitado), listagem (ordenação padrão, filtro inicial por supermercado, situação, período, vazio, erro, exclusão), formulário (cálculos, divergência, sugestão única e ambígua, validação, data/hora sem fuso, rascunho, confirmação aceita e recusada com atualização na nova tentativa, erros nos itens, chave duplicada, imagem inválida e envio após salvar, edição preservando totais impressos, 404), detalhes (dados, alertas, itens não identificados, confirmação, remoção de imagem, 404).
 - Fase 4: serviço de importações, cartão de envio (upload e navegação, limite de 5 MB, formato, leitor indisponível, leituras em aberto), página de conferência (consulta periódica até concluir e parada, formulário pré-preenchido, falha com nova tentativa/cadastro manual/descarte, compra registrada, 404), formulário em modo conferência (pré-preenchimento com totais impressos e campos vazios, cadastro do supermercado lido, confirmação pela importação, recusa dos alertas, cadastro manual sem leitura, descarte), pré-preenchimento do cadastro de supermercado, `confirmWith`.
 - Fase 5: opções dos gráficos como funções puras (cor por loja em ordem fixa sem ciclar, séries por loja, legenda/rótulos diretos, métrica normalizada, barras ordenadas com rótulo só no menor), períodos, indicadores, página de histórico (vazio, carregamento por `?productId=`, gráfico com descrição acessível, comparação, alternativas, compras, troca de métrica, refetch ao mudar o período, produto sem compras, recarga após associação), diálogo de associação.
+- Fase 6:
+  - Construtores de gráficos: ordenação, rótulo seletivo, eixo único, paleta em ordem fixa e cor "outras" a partir da 9ª série.
+  - Períodos pré-definidos e leitura/escrita dos filtros na URL, com valores inválidos voltando ao padrão.
+  - Rótulos de mês e alinhamento do comparativo mês anterior × mês atual.
+  - Serviço: query string e nome do arquivo exportado, com reserva.
+  - Formatação das células por tipo.
+  - Dashboard: indicadores, gráficos e links com filtros, vazio, troca de filtros e erro.
+  - Relatórios: tabela com linha de total, relatório/ranking pela URL e sincronização, exportação com os mesmos filtros, erro na exportação.
 
 **Verificação manual (navegador)**
 - Fase 2: listagem de categorias; cadastro de supermercado com CNPJ inválido (erro do backend exibido no campo) e depois válido; cadastro de produto com redirecionamento aos detalhes; inclusão de descrição alternativa e rejeição de equivalente com acento/caixa diferentes; paginador em português; layout a 375 px.
 - Fase 3: nova compra com seletor de supermercado por busca; descrição "leite int 1l" associada automaticamente ao produto; total do item e totais da nota calculados; total divergente digitado → aviso em tempo real → diálogo com o alerta do backend → confirmação; detalhes com alertas, item não identificado e imagem anexada; listagem filtrada por `?storeId=`; edição carregando a compra confirmada. Corrigido durante a verificação: horários de auditoria exibidos 3 h adiantados (datas UTC sem "Z").
 - Fase 4 (sem chave configurada): Nova compra informa que a leitura está indisponível; imagem enviada → leitura falha com a mensagem de configuração → "Cadastrar manualmente com esta imagem" → compra confirmada com a imagem e vínculo em `processing`. Corrigidos durante a verificação: texto duplicado no aviso, formulário espremido na coluna da conferência (passou a usar *container queries*) e totais automáticos desligados no cadastro manual após falha.
 - Fase 5: compras de teste em duas lojas → histórico com indicadores (médio R$ 5,35; variação +25,05%), gráfico de linhas por loja com legenda e rótulos, barras com o menor preço rotulado, tabela de comparação ("Mais barato", +9,11%), produto da mesma categoria por litro, item sem produto associado pelo diálogo (descrição aprendida aparece no produto), resumo nos detalhes do produto.
+- Fase 6:
+  - Dados de teste: 5 compras confirmadas em 2 lojas, de agosto a novembro.
+  - Dashboard: total de R$ 237,65, 5 compras, ticket médio de R$ 47,53, maior compra de R$ 51,57 e Mercado Teste A com maior gasto. Evolução mensal com 12 meses e os meses sem compra zerados; distribuições, produtos e comparativo entre meses corretos.
+  - Relatórios: mensal com subtotal anual; produtos por maior aumento (Arroz +20,08%); comparação com o período anterior de mesma duração (+4,46%); troca de relatório pelo seletor, atualizando a URL.
+  - Exportações baixadas pela API: CSV (BOM, `;`, vírgula decimal), xlsx válido e PDF conferido visualmente.
+  - Corrigidos durante a verificação: rótulos do eixo de valores sobrepostos nos gráficos estreitos, e cor do indicador em destaque (verde-limão forte, trocado pelo contêiner secundário do tema).
 - Os registros e as imagens criados nas verificações foram excluídos do banco e da pasta de uploads locais.
 
 ## 5. Decisões técnicas
@@ -232,11 +285,17 @@
 | D47 | **Associação posterior em lote por descrição normalizada** (`/api/price-history/assign`), em transação, com aprendizado da descrição. | RN06 com pouco esforço: a mesma descrição costuma se repetir em várias compras. |
 | D48 | **ECharts modular e sob demanda** (`echarts/core` + módulos usados; `provideEchartsCore` com `import()` dinâmico). | Bundle inicial praticamente inalterado. |
 | D49 | **Paleta categórica de referência das diretrizes de visualização** (8 cores em ordem fixa, validada: CVD ΔE ≥ 9,1 entre vizinhas). Três cores têm contraste < 3:1 com a superfície; a compensação é a tabela com os mesmos dados e a legenda. Tema claro apenas (o app ainda não tem modo escuro). | Gráficos legíveis para daltônicos e sem depender só da cor. |
+| D50 | **Dashboard e relatórios partem da mesma leitura** (`AnalyticsData`) e os relatórios usam uma tabela genérica (`ReportTable`) que serve à tela e às três exportações. Período padrão: últimos 12 meses. | Os números da tela, do gráfico e do arquivo exportado não divergem; um novo relatório não exige código de exportação. |
+| D51 | **Filtro de categoria soma apenas os itens da categoria** em cada compra (não o total da nota); a contagem considera as compras que têm ao menos um item da categoria. | "Quanto gastei com laticínios" é a soma dos laticínios, não das notas inteiras. |
+| D52 | **Distribuição por categoria fecha com o total gasto**: itens sem produto aparecem como "Itens sem produto associado" e a diferença entre o total das notas e a soma dos itens (descontos e acréscimos gerais) como "Ajustes da nota". | A soma das categorias confere com o indicador de total; nada desaparece da análise. |
+| D53 | **CSV no padrão do Excel em português**: separador `;`, vírgula decimal, UTF-8 com BOM, valores sem símbolo de moeda. | Abre corretamente com duplo clique no Excel pt-BR e continua legível por outras ferramentas. |
+| D54 | **ClosedXML (MIT) para Excel e QuestPDF (licença Community) para PDF.** A licença é declarada em `Program.cs`; a Community é gratuita para uso pessoal e para organizações com receita anual abaixo de US$ 1 milhão. | Bibliotecas maduras e sem dependências nativas; nenhuma geração de arquivo no navegador. |
+| D55 | **Filtros do dashboard e dos relatórios na URL** (`period`, `from`, `to`, `storeId`, `categoryId`, `report`, `ranking`). | Links "Ver relatório" levam a tabela com os mesmos filtros (a tabela é a alternativa acessível ao gráfico); recarregar ou compartilhar mantém a análise. |
 
 ## 6. Funcionalidades pendentes
 
 - Fase 4: validar a leitura real com uma chave da Anthropic e fotos de notas reais (ajustar prompt/esforço se necessário).
-- Fases 6 e 7: conforme a tabela da seção 1.
+- Fase 7: conforme a tabela da seção 1 e a seção 8.
 
 ## 7. Problemas conhecidos
 
@@ -254,8 +313,10 @@
 - O histórico e os indicadores são calculados em memória a partir das observações do produto (sem paginação); adequado ao volume de uso pessoal.
 - O recálculo do preço normalizado percorre todas as observações a cada inicialização; com volumes muito grandes, convém restringi-lo.
 - A cor de cada loja no gráfico segue a ordem dos identificadores das lojas presentes no período exibido; ao mudar o período, uma loja pode trocar de cor se outra deixar de aparecer.
+- Dashboard e relatórios agregam em memória as compras confirmadas do período (somas exatas em `decimal`); adequado ao volume de uso pessoal. Para volumes muito grandes, mover as somas para SQL sobre os inteiros escalados.
+- Nos primeiros instantes após abrir o dashboard, enquanto o menu lateral termina de abrir, o gráfico mensal pode aparecer estreito; o ECharts se ajusta sozinho ao tamanho final.
+- O PDF usa as fontes padrão do QuestPDF (Lato); nomes com caracteres fora do latim podem não ser exibidos.
 
-## 8. Próxima etapa — Fase 6 (Dashboard e relatórios)
+## 8. Próxima etapa — Fase 7 (Qualidade e entrega)
 
-1. Backend: `GET /api/dashboard` (total no mês e no ano, quantidade de compras, ticket médio, maior compra, supermercado com maior gasto), `/api/dashboard/monthly`, `/stores`, `/categories`, com filtros de período, mês/ano, supermercado e categoria — somente compras confirmadas (RN09), somas em SQL sobre inteiros e médias em `decimal`; relatórios `/api/reports/monthly|stores|categories|products` (mais comprados, maior gasto, maior aumento de preço, comparação entre períodos) e `/api/reports/export` em CSV, Excel e PDF refletindo os filtros; testes de consistência entre dashboard, relatórios e compras.
-2. Frontend: Dashboard com indicadores e gráficos (evolução mensal, por supermercado, por categoria, produtos com maior participação, comparativo entre meses) e filtros; tela de Relatórios com filtros e exportações; testes.
+Conforme a especificação: autenticação (entidade `Usuario`, D12), backup e restauração do banco, gerenciamento de imagens órfãs (D32), revisão de segurança (cabeçalhos, limites, CORS de produção), tela de Configurações, revisão de acessibilidade e de desempenho, e documentação de publicação.

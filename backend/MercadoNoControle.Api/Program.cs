@@ -3,6 +3,7 @@ using MercadoNoControle.Api.Configuration;
 using MercadoNoControle.Api.Data;
 using MercadoNoControle.Api.Services;
 using MercadoNoControle.Api.Services.Ai;
+using MercadoNoControle.Api.Services.Analytics;
 using MercadoNoControle.Api.Services.Imports;
 using MercadoNoControle.Api.Services.PriceHistory;
 using MercadoNoControle.Api.Services.Receipts;
@@ -35,6 +36,12 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IReceiptService, ReceiptService>();
 builder.Services.AddScoped<PriceObservationRecorder>();
 builder.Services.AddScoped<IPriceHistoryService, PriceHistoryService>();
+builder.Services.AddScoped<AnalyticsData>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+
+// QuestPDF: licença Community (uso pessoal / receita anual inferior a US$ 1 milhão).
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 builder.Services.Configure<ImageUploadOptions>(builder.Configuration.GetSection(ImageUploadOptions.SectionName));
 builder.Services.AddSingleton<IReceiptImageStorage, ReceiptImageStorage>();
 

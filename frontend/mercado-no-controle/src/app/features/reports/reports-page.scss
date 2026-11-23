@@ -1,0 +1,35 @@
+.report-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.report-picker__report {
+  flex: 0 1 320px;
+}
+
+.report-picker__ranking {
+  flex: 0 1 260px;
+}
+
+.report-header {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.exports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.notes {
+  margin: 8px 0 12px;
+}
+
+.total-row td {
+  font-weight: 600;
+  background: var(--mat-sys-surface-container-low);
+}

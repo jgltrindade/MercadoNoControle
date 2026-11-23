@@ -1,0 +1,151 @@
+@if (filters(); as initial) {
+  <app-analytics-filters [initial]="initial" [initialStore]="initialStore()" (changed)="onFiltersChanged($event)" />
+}
+
+@if (summary.isLoading()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+@if (loadError(); as message) {
+  <mat-card appearance="outlined">
+    <app-empty-state icon="error" title="Não foi possível carregar o dashboard" [message]="message">
+      <button mat-stroked-button type="button" (click)="summary.reload()">Tentar novamente</button>
+    </app-empty-state>
+  </mat-card>
+} @else if (data(); as data) {
+  <section class="kpis" aria-label="Indicadores">
+    <div class="kpi kpi--hero">
+      <span class="kpi__label">Total gasto no período</span>
+      <span class="kpi__value">{{ data.totalSpent | currency }}</span>
+      <span class="kpi__detail">{{ data.from | date: 'dd/MM/yyyy' }} a {{ data.to | date: 'dd/MM/yyyy' }}</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">Compras</span>
+      <span class="kpi__value">{{ data.purchaseCount }}</span>
+      <span class="kpi__detail">no período</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">Ticket médio</span>
+      <span class="kpi__value">{{ data.averageTicket !== null ? (data.averageTicket | currency) : '—' }}</span>
+      <span class="kpi__detail">por compra</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">Maior compra</span>
+      @if (data.largestPurchase; as largest) {
+        <a class="kpi__value link" [routerLink]="['/receipts', largest.receiptId]">{{ largest.total | currency }}</a>
+        <span class="kpi__detail">{{ largest.date | date: 'dd/MM/yyyy' }} · {{ largest.storeName }}</span>
+      } @else {
+        <span class="kpi__value">—</span>
+      }
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">Supermercado com maior gasto</span>
+      @if (data.topStore; as top) {
+        <span class="kpi__value kpi__value--text">{{ top.storeName }}</span>
+        <span class="kpi__detail">{{ top.total | currency }}</span>
+      } @else {
+        <span class="kpi__value">—</span>
+      }
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">Total no mês</span>
+      <span class="kpi__value">{{ data.currentMonthTotal | currency }}</span>
+      <span class="kpi__detail">mês atual</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi__label">Total no ano</span>
+      <span class="kpi__value">{{ data.currentYearTotal | currency }}</span>
+      <span class="kpi__detail">ano atual</span>
+    </div>
+  </section>
+
+  @if (data.purchaseCount === 0) {
+    <mat-card appearance="outlined">
+      <app-empty-state
+        icon="insights"
+        title="Nenhuma compra confirmada no período"
+        message="Os indicadores e gráficos consideram apenas compras confirmadas. Ajuste os filtros ou registre uma compra."
+      >
+        <a mat-flat-button routerLink="/receipts/new">Nova compra</a>
+      </app-empty-state>
+    </mat-card>
+  } @else {
+    <div class="charts">
+      <mat-card appearance="outlined" class="charts__wide">
+        <mat-card-header>
+          <mat-card-title>Evolução mensal dos gastos</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <app-chart [options]="monthlyOption()" label="Total gasto por mês no período. Valores no relatório mensal." [height]="280" />
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <a mat-button routerLink="/reports" [queryParams]="reportLink('monthly')">Ver relatório</a>
+        </mat-card-actions>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Distribuição por supermercado</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <app-chart [options]="storesOption()" label="Total gasto por supermercado, do maior para o menor. Valores no relatório por supermercado." [height]="48 + storeCount() * 36" />
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <a mat-button routerLink="/reports" [queryParams]="reportLink('stores')">Ver relatório</a>
+        </mat-card-actions>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Distribuição por categoria</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <app-chart [options]="categoriesOption()" label="Total gasto por categoria, do maior para o menor. Valores no relatório por categoria." [height]="48 + categoryCount() * 36" />
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <a mat-button routerLink="/reports" [queryParams]="reportLink('categories')">Ver relatório</a>
+        </mat-card-actions>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Produtos com maior participação</mat-card-title>
+          <mat-card-subtitle>10 produtos com maior gasto no período</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          @if (productCount() > 0) {
+            <app-chart [options]="productsOption()" label="Produtos com maior gasto no período. Valores no relatório de produtos." [height]="48 + productCount() * 36" />
+          } @else {
+            <p class="muted">Nenhum item associado a produtos no período.</p>
+          }
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <a mat-button routerLink="/reports" [queryParams]="reportLink('products')">Ver relatório</a>
+        </mat-card-actions>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Comparativo entre meses</mat-card-title>
+          <mat-card-subtitle>Mês anterior × mês atual, por categoria</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          @if (monthComparison(); as comparison) {
+            @if (comparison.categories.length) {
+              <app-chart
+                [options]="monthComparisonOption()"
+                label="Gasto por categoria no mês anterior e no mês atual. Valores no relatório de comparação."
+                [height]="56 + comparison.categories.length * 44"
+              />
+            } @else {
+              <p class="muted">Sem compras no mês atual nem no anterior.</p>
+            }
+          }
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <a mat-button routerLink="/reports" [queryParams]="comparisonLink()">Ver relatório</a>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+  }
+}

@@ -1,30 +1,13 @@
 import type { EChartsCoreOption } from 'echarts/core';
 import { NORMALIZED_UNIT_LABELS, NormalizedUnit, PricePoint, StorePriceComparison } from './price-history.service';
 
-/**
- * Paleta categórica (identidade) em ordem fixa, validada para daltonismo contra a superfície
- * clara do app. Nunca é ciclada: a partir da 9ª loja, as demais usam a cor "outras".
- */
-export const CATEGORICAL_PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
-export const OTHER_COLOR = '#898781';
+import { CATEGORICAL_PALETTE, CHART_INK, OTHER_COLOR, formatMoney } from '../../shared/charts/chart-theme';
 
-/** Tinta e elementos de apoio (texto nunca usa a cor da série). */
-export const CHART_INK = {
-  surface: '#fbfdf7',
-  secondary: '#52514e',
-  muted: '#6b6a65',
-  gridline: '#e1e0d9',
-  baseline: '#c3c2b7',
-};
+export { CATEGORICAL_PALETTE, CHART_INK, OTHER_COLOR, formatMoney };
 
 export type PriceMetric = 'paid' | 'normalized';
 
-const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 });
 const shortDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-
-export function formatMoney(value: number): string {
-  return currency.format(value);
-}
 
 /**
  * Cor de cada supermercado pela ordem do identificador (a cor acompanha a loja, não a
