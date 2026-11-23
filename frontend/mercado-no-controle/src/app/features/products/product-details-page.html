@@ -1,0 +1,112 @@
+<a mat-button routerLink="/products" class="back-link">
+  <mat-icon>arrow_back</mat-icon>
+  Produtos
+</a>
+
+@if (productResource.isLoading() && !product()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+@if (loadError(); as error) {
+  <mat-card appearance="outlined">
+    @if (error.status === 404) {
+      <app-empty-state icon="search_off" title="Produto não encontrado" message="O produto pode ter sido excluído.">
+        <a mat-flat-button routerLink="/products">Voltar aos produtos</a>
+      </app-empty-state>
+    } @else {
+      <app-empty-state icon="error" title="Não foi possível carregar o produto" [message]="error.message">
+        <button mat-stroked-button type="button" (click)="productResource.reload()">Tentar novamente</button>
+      </app-empty-state>
+    }
+  </mat-card>
+} @else if (product(); as product) {
+  <div class="details-grid">
+    <mat-card appearance="outlined" class="details-grid__main">
+      <mat-card-header>
+        <mat-card-title>{{ product.name }}</mat-card-title>
+        <mat-card-subtitle>{{ product.brand ?? 'Sem marca' }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <dl class="properties">
+          <dt>Categoria</dt>
+          <dd>{{ product.categoryName ?? 'Sem categoria' }}</dd>
+          <dt>Embalagem</dt>
+          <dd>{{ packageLabel() }}</dd>
+          <dt>Código de barras</dt>
+          <dd>{{ product.barcode ?? '—' }}</dd>
+          <dt>Situação</dt>
+          <dd>
+            <span class="status-badge" [class.status-badge--inactive]="product.status === 'Inactive'">
+              {{ statusLabels[product.status] }}
+            </span>
+          </dd>
+          <dt>Cadastrado em</dt>
+          <dd>{{ product.createdAt | date: 'dd/MM/yyyy' }}</dd>
+        </dl>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <button mat-button type="button" (click)="delete()">
+          <mat-icon>delete</mat-icon>
+          Excluir
+        </button>
+        <button mat-flat-button type="button" (click)="edit()">
+          <mat-icon>edit</mat-icon>
+          Editar
+        </button>
+      </mat-card-actions>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="details-grid__aliases">
+      <mat-card-header>
+        <mat-card-title>Descrições alternativas</mat-card-title>
+        <mat-card-subtitle>Como este produto aparece nas notas fiscais</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form class="alias-form" [formGroup]="aliasForm" (ngSubmit)="addAlias()" novalidate>
+          <mat-form-field subscriptSizing="dynamic">
+            <mat-label>Nova descrição</mat-label>
+            <input matInput formControlName="description" maxlength="250" placeholder="Ex.: LEITE INT 1L" />
+            <mat-error>{{ errorMessage(aliasControl) }}</mat-error>
+          </mat-form-field>
+          <button mat-stroked-button type="submit" [disabled]="addingAlias()">Adicionar</button>
+        </form>
+
+        @if (product.aliases.length === 0) {
+          <p class="muted">Nenhuma descrição associada.</p>
+        } @else {
+          <mat-list>
+            @for (alias of product.aliases; track alias.id) {
+              <mat-list-item>
+                <mat-icon matListItemIcon [class.pending]="!alias.confirmed">
+                  {{ alias.confirmed ? 'check_circle' : 'help' }}
+                </mat-icon>
+                <span matListItemTitle>{{ alias.description }}</span>
+                <span matListItemLine class="muted">
+                  {{ sourceLabels[alias.source] }} · {{ alias.confirmed ? 'Confirmada' : 'Aguardando confirmação' }}
+                </span>
+                <div matListItemMeta class="alias-actions">
+                  @if (!alias.confirmed) {
+                    <button mat-icon-button type="button" matTooltip="Confirmar associação" (click)="confirmAlias(alias)">
+                      <mat-icon>done</mat-icon>
+                    </button>
+                  }
+                  <button mat-icon-button type="button" matTooltip="Remover" [attr.aria-label]="'Remover ' + alias.description" (click)="removeAlias(alias)">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </mat-list-item>
+            }
+          </mat-list>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="details-grid__full">
+      <app-empty-state
+        icon="monitoring"
+        title="Histórico de preços"
+        message="A evolução de preços e a comparação entre supermercados aparecerão aqui (Fase 5)."
+      />
+    </mat-card>
+  </div>
+}

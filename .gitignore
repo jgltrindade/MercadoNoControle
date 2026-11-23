@@ -1,0 +1,34 @@
+# Dados locais (banco SQLite e imagens de notas) — nunca versionar
+/data/*
+!/data/.gitkeep
+/uploads/*
+!/uploads/.gitkeep
+*.db
+*.db-shm
+*.db-wal
+
+# Segredos e configurações locais
+.env
+.env.*
+**/appsettings.*.local.json
+**/secrets.json
+
+# .NET
+**/bin/
+**/obj/
+*.user
+.vs/
+TestResults/
+
+# Node / Angular
+**/node_modules/
+**/dist/
+**/.angular/
+**/coverage/
+
+# Claude Code (configurações pessoais)
+.claude/settings.local.json
+
+# Sistema
+.DS_Store
+Thumbs.db

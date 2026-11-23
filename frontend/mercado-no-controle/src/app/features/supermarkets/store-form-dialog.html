@@ -1,0 +1,60 @@
+<h2 mat-dialog-title>{{ store ? 'Editar supermercado' : 'Novo supermercado' }}</h2>
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <mat-dialog-content class="form-grid">
+    <mat-form-field class="form-grid__full">
+      <mat-label>Nome fantasia</mat-label>
+      <input matInput formControlName="tradeName" maxlength="150" required cdkFocusInitial />
+      <mat-error>{{ errorMessage(form.controls.tradeName) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field class="form-grid__full">
+      <mat-label>Razão social</mat-label>
+      <input matInput formControlName="legalName" maxlength="200" />
+      <mat-error>{{ errorMessage(form.controls.legalName) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field subscriptSizing="dynamic">
+      <mat-label>CNPJ</mat-label>
+      <input matInput formControlName="cnpj" maxlength="18" placeholder="00.000.000/0000-00" autocomplete="off" />
+      <mat-hint>Numérico ou alfanumérico; identifica o estabelecimento.</mat-hint>
+      <mat-error>{{ errorMessage(form.controls.cnpj) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Cidade</mat-label>
+      <input matInput formControlName="city" maxlength="100" />
+      <mat-error>{{ errorMessage(form.controls.city) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Endereço</mat-label>
+      <input matInput formControlName="address" maxlength="250" />
+      <mat-error>{{ errorMessage(form.controls.address) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>UF</mat-label>
+      <mat-select formControlName="state">
+        <mat-option value="">—</mat-option>
+        @for (uf of states; track uf) {
+          <mat-option [value]="uf">{{ uf }}</mat-option>
+        }
+      </mat-select>
+      <mat-error>{{ errorMessage(form.controls.state) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field class="form-grid__full">
+      <mat-label>Observações</mat-label>
+      <textarea matInput formControlName="notes" maxlength="1000" rows="3"></textarea>
+      <mat-error>{{ errorMessage(form.controls.notes) }}</mat-error>
+    </mat-form-field>
+
+    @if (formError()) {
+      <p class="form-error form-grid__full" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close [disabled]="saving()">Cancelar</button>
+    <button mat-flat-button type="submit" [disabled]="saving()">{{ saving() ? 'Salvando…' : 'Salvar' }}</button>
+  </mat-dialog-actions>
+</form>

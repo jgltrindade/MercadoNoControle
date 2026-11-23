@@ -1,0 +1,69 @@
+<h2 mat-dialog-title>{{ product ? 'Editar produto' : 'Novo produto' }}</h2>
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <mat-dialog-content class="form-grid">
+    <mat-form-field class="form-grid__full" subscriptSizing="dynamic">
+      <mat-label>Nome padronizado</mat-label>
+      <input matInput formControlName="name" maxlength="150" required placeholder="Ex.: Leite Integral 1L" cdkFocusInitial />
+      <mat-hint>Produtos de marcas ou tamanhos diferentes devem ser cadastrados separadamente.</mat-hint>
+      <mat-error>{{ errorMessage(form.controls.name) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Marca</mat-label>
+      <input matInput formControlName="brand" maxlength="100" />
+      <mat-error>{{ errorMessage(form.controls.brand) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Categoria</mat-label>
+      <mat-select formControlName="categoryId">
+        <mat-option [value]="null">Sem categoria</mat-option>
+        @for (category of categories(); track category.id) {
+          <mat-option [value]="category.id">{{ category.name }}</mat-option>
+        }
+      </mat-select>
+      <mat-error>{{ errorMessage(form.controls.categoryId) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Unidade de medida</mat-label>
+      <mat-select formControlName="unit" required>
+        @for (unit of units; track unit.value) {
+          <mat-option [value]="unit.value">{{ unit.label }}</mat-option>
+        }
+      </mat-select>
+      <mat-error>{{ errorMessage(form.controls.unit) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field subscriptSizing="dynamic">
+      <mat-label>Conteúdo da embalagem</mat-label>
+      <input matInput type="number" formControlName="packageContent" min="0" step="any" />
+      <span matTextSuffix>{{ form.controls.unit.value }}</span>
+      <mat-hint>Ex.: 1 para 1 L; 500 para 500 g. Permite o preço por kg/litro.</mat-hint>
+      <mat-error>{{ errorMessage(form.controls.packageContent) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Código de barras (EAN/GTIN)</mat-label>
+      <input matInput formControlName="barcode" maxlength="14" inputmode="numeric" autocomplete="off" />
+      <mat-error>{{ errorMessage(form.controls.barcode) }}</mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Situação</mat-label>
+      <mat-select formControlName="status" required>
+        @for (status of statuses; track status[0]) {
+          <mat-option [value]="status[0]">{{ status[1] }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (formError()) {
+      <p class="form-error form-grid__full" role="alert">{{ formError() }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close [disabled]="saving()">Cancelar</button>
+    <button mat-flat-button type="submit" [disabled]="saving()">{{ saving() ? 'Salvando…' : 'Salvar' }}</button>
+  </mat-dialog-actions>
+</form>

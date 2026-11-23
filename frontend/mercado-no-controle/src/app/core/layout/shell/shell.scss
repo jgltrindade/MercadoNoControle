@@ -1,0 +1,72 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.shell {
+  height: 100%;
+}
+
+.shell__sidenav {
+  width: 260px;
+  border-right: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-low);
+}
+
+.shell__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 20px;
+  font: var(--mat-sys-title-medium);
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+}
+
+.shell__brand-icon {
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+}
+
+.shell__body {
+  display: flex;
+  flex-direction: column;
+  background: var(--mat-sys-surface);
+}
+
+.shell__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  gap: 8px;
+  background: var(--mat-sys-surface);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.shell__title {
+  margin: 0;
+  font: var(--mat-sys-title-large);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell__spacer {
+  flex: 1 1 auto;
+}
+
+.shell__content {
+  flex: 1 1 auto;
+  padding: 24px;
+  max-width: 1400px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 599px) {
+  .shell__content {
+    padding: 16px;
+  }
+}

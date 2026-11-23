@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MercadoNoControle.Api/MercadoNoControle.Api.csproj" />
+  <Project Path="MercadoNoControle.Tests/MercadoNoControle.Tests.csproj" />
+</Solution>

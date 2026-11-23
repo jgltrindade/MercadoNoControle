@@ -1,0 +1,64 @@
+<app-page-toolbar description="Organize os produtos por categoria. Categorias com produtos não podem ser excluídas.">
+  <button mat-flat-button type="button" (click)="openForm()">
+    <mat-icon>add</mat-icon>
+    Nova categoria
+  </button>
+</app-page-toolbar>
+
+<mat-card appearance="outlined" class="list-card">
+  @if (categories.isLoading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  @if (loadError(); as message) {
+    <app-empty-state icon="error" title="Não foi possível carregar as categorias" [message]="message">
+      <button mat-stroked-button type="button" (click)="categories.reload()">Tentar novamente</button>
+    </app-empty-state>
+  } @else if (rows().length === 0 && !categories.isLoading()) {
+    <app-empty-state icon="category" title="Nenhuma categoria cadastrada" message="Crie categorias para organizar seus produtos.">
+      <button mat-flat-button type="button" (click)="openForm()">Nova categoria</button>
+    </app-empty-state>
+  } @else {
+    <div class="table-container">
+      <table mat-table [dataSource]="rows()" aria-label="Categorias">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Nome</th>
+          <td mat-cell *matCellDef="let category">{{ category.name }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="description">
+          <th mat-header-cell *matHeaderCellDef>Descrição</th>
+          <td mat-cell *matCellDef="let category" class="muted">{{ category.description ?? '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="productCount">
+          <th mat-header-cell *matHeaderCellDef class="cell-number">Produtos</th>
+          <td mat-cell *matCellDef="let category" class="cell-number">{{ category.productCount }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef><span class="visually-hidden">Ações</span></th>
+          <td mat-cell *matCellDef="let category" class="cell-actions">
+            <button mat-icon-button type="button" matTooltip="Editar" [attr.aria-label]="'Editar ' + category.name" (click)="openForm(category)">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <span [matTooltip]="category.productCount > 0 ? 'Categoria com produtos não pode ser excluída' : 'Excluir'">
+              <button
+                mat-icon-button
+                type="button"
+                [disabled]="category.productCount > 0"
+                [attr.aria-label]="'Excluir ' + category.name"
+                (click)="delete(category)"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </span>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns"></tr>
+      </table>
+    </div>
+  }
+</mat-card>
