@@ -25,6 +25,8 @@ public interface IProductService
     Task<ProductAliasResponse> ConfirmAliasAsync(int productId, int aliasId, CancellationToken cancellationToken);
 
     Task DeleteAliasAsync(int productId, int aliasId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<ProductMatch>> MatchAsync(string description, CancellationToken cancellationToken);
 }
 
 public sealed class ProductService(AppDbContext db, TimeProvider timeProvider) : IProductService
@@ -164,6 +166,36 @@ public sealed class ProductService(AppDbContext db, TimeProvider timeProvider) :
         var alias = await FindAliasAsync(productId, aliasId, cancellationToken);
         db.ProductAliases.Remove(alias);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Produtos associados a uma descrição de nota (comparação pela forma normalizada).
+    /// Associações confirmadas vêm primeiro. Mais de um resultado indica ambiguidade,
+    /// que deve ser resolvida pelo usuário.
+    /// </summary>
+    public async Task<IReadOnlyList<ProductMatch>> MatchAsync(string description, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return [];
+        }
+
+        var normalized = TextNormalizer.NormalizeDescription(description);
+        return await db.ProductAliases
+            .AsNoTracking()
+            .Where(a => a.NormalizedDescription == normalized)
+            .OrderByDescending(a => a.Confirmed)
+            .ThenBy(a => a.Product.Name)
+            .Select(a => new ProductMatch(
+                a.ProductId,
+                a.Product.Name,
+                a.Product.Brand,
+                a.Product.Unit,
+                a.Product.PackageContent,
+                a.Product.Status,
+                a.Confirmed,
+                a.Source))
+            .ToListAsync(cancellationToken);
     }
 
     private async Task ApplyAsync(Product product, ProductRequest request, CancellationToken cancellationToken)

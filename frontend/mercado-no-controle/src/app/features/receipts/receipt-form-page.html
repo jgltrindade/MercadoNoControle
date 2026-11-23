@@ -1,0 +1,269 @@
+<a mat-button [routerLink]="isEdit() ? ['/receipts', id()] : ['/receipts']" class="back-link">
+  <mat-icon>arrow_back</mat-icon>
+  {{ isEdit() ? 'Voltar à compra' : 'Notas fiscais' }}
+</a>
+
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+} @else if (loadError(); as message) {
+  <mat-card appearance="outlined">
+    <app-empty-state icon="error" title="Não foi possível abrir a compra" [message]="message">
+      <a mat-flat-button routerLink="/receipts">Voltar às compras</a>
+    </app-empty-state>
+  </mat-card>
+} @else {
+  <form [formGroup]="form" (ngSubmit)="save(false)" novalidate class="receipt-form">
+    @if (isEdit() && status() === 'Confirmed') {
+      <p class="info-banner" role="note">
+        <mat-icon>info</mat-icon>
+        Esta compra está confirmada. As alterações atualizam relatórios e o histórico de preços.
+      </p>
+    }
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Dados da nota</mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="form-grid form-grid--3">
+        <div class="form-grid__wide store-field">
+          <app-search-picker
+            formControlName="store"
+            label="Supermercado"
+            [required]="true"
+            [search]="pickers.searchStores"
+            [display]="storeName"
+            [describe]="storeDescription"
+            createLabel="Cadastrar novo supermercado"
+            (create)="createStore()"
+          />
+        </div>
+
+        <mat-form-field>
+          <mat-label>Data de emissão</mat-label>
+          <input matInput [matDatepicker]="issuedPicker" formControlName="issuedDate" required />
+          <mat-datepicker-toggle matIconSuffix [for]="issuedPicker" />
+          <mat-datepicker #issuedPicker />
+          <mat-error>{{ errorMessage(form.controls.issuedDate) ?? 'Data inválida.' }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Horário</mat-label>
+          <input matInput type="time" formControlName="issuedTime" required />
+          <mat-error>{{ errorMessage(form.controls.issuedTime) }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Número</mat-label>
+          <input matInput formControlName="number" maxlength="20" />
+          <mat-error>{{ errorMessage(form.controls.number) }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Série</mat-label>
+          <input matInput formControlName="series" maxlength="10" />
+          <mat-error>{{ errorMessage(form.controls.series) }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field class="form-grid__wide" subscriptSizing="dynamic">
+          <mat-label>Chave de acesso</mat-label>
+          <input matInput formControlName="accessKey" maxlength="60" autocomplete="off" />
+          <mat-hint>Opcional. Identifica a nota e impede que seja registrada duas vezes.</mat-hint>
+          <mat-error>{{ errorMessage(form.controls.accessKey) }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Forma de pagamento</mat-label>
+          <input matInput formControlName="paymentMethod" maxlength="60" />
+          <mat-error>{{ errorMessage(form.controls.paymentMethod) }}</mat-error>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Itens</mat-card-title>
+        <mat-card-subtitle>
+          {{ summary().itemCount }} item(ns)
+          @if (summary().unidentified > 0) {
+            · {{ summary().unidentified }} sem produto associado
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content formArrayName="items">
+        @for (item of items.controls; track item; let i = $index) {
+          <div class="item-row" [formGroupName]="i">
+            <span class="item-row__number">{{ i + 1 }}</span>
+
+            <mat-form-field class="item-row__description">
+              <mat-label>Descrição na nota</mat-label>
+              <input matInput formControlName="description" maxlength="250" required (blur)="suggestProduct(item)" />
+              <mat-error>{{ errorMessage(item.controls.description) }}</mat-error>
+            </mat-form-field>
+
+            <app-search-picker
+              class="item-row__product"
+              formControlName="product"
+              label="Produto"
+              subscriptSizing="dynamic"
+              [search]="pickers.searchProducts"
+              [display]="productName"
+              [describe]="productDescription"
+              [hint]="item.controls.hint.value ?? (item.controls.product.value ? null : 'Opcional — pode ser associado depois')"
+              createLabel="Cadastrar novo produto"
+              (create)="createProductFor(item)"
+            />
+
+            <div class="item-row__numbers">
+            <mat-form-field>
+              <mat-label>Qtd.</mat-label>
+              <input matInput type="number" formControlName="quantity" min="0" step="any" required />
+              <mat-error>{{ errorMessage(item.controls.quantity) }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field>
+              <mat-label>Un.</mat-label>
+              <input matInput formControlName="unit" maxlength="10" />
+            </mat-form-field>
+
+            <mat-form-field>
+              <mat-label>Preço unit.</mat-label>
+              <input matInput type="number" formControlName="unitPrice" min="0" step="any" required />
+              <mat-error>{{ errorMessage(item.controls.unitPrice) }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field>
+              <mat-label>Desconto</mat-label>
+              <input matInput type="number" formControlName="discount" min="0" step="0.01" />
+              <mat-error>{{ errorMessage(item.controls.discount) }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field>
+              <mat-label>Total</mat-label>
+              <input matInput type="number" formControlName="total" min="0" step="0.01" required />
+              <mat-error>{{ errorMessage(item.controls.total) }}</mat-error>
+            </mat-form-field>
+            </div>
+
+            <button
+              mat-icon-button
+              type="button"
+              class="item-row__remove"
+              matTooltip="Remover item"
+              [attr.aria-label]="'Remover item ' + (i + 1)"
+              (click)="removeItem(i)"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        } @empty {
+          <p class="muted">Nenhum item. Adicione os itens da nota.</p>
+        }
+
+        <button mat-stroked-button type="button" (click)="addItem()">
+          <mat-icon>add</mat-icon>
+          Adicionar item
+        </button>
+      </mat-card-content>
+    </mat-card>
+
+    <div class="bottom-grid">
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Totais</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-checkbox formControlName="autoTotals">Calcular os totais a partir dos itens</mat-checkbox>
+          <div class="form-grid totals-grid">
+            <mat-form-field>
+              <mat-label>Valor dos produtos</mat-label>
+              <input matInput type="number" formControlName="productsTotal" min="0" step="0.01" [readonly]="form.controls.autoTotals.value" />
+              <mat-error>{{ errorMessage(form.controls.productsTotal) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>Descontos</mat-label>
+              <input matInput type="number" formControlName="discountTotal" min="0" step="0.01" [readonly]="form.controls.autoTotals.value" />
+              <mat-error>{{ errorMessage(form.controls.discountTotal) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>Acréscimos</mat-label>
+              <input matInput type="number" formControlName="additionalCharges" min="0" step="0.01" />
+              <mat-error>{{ errorMessage(form.controls.additionalCharges) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>Valor total</mat-label>
+              <input matInput type="number" formControlName="total" min="0" step="0.01" [readonly]="form.controls.autoTotals.value" />
+              <mat-error>{{ errorMessage(form.controls.total) }}</mat-error>
+            </mat-form-field>
+          </div>
+
+          <dl class="summary" aria-live="polite">
+            <dt>Soma dos itens</dt>
+            <dd>{{ summary().itemsGross | currency }}</dd>
+            <dt>Produtos − descontos + acréscimos</dt>
+            <dd>{{ summary().expectedTotal | currency }}</dd>
+          </dl>
+          @if (summary().productsMismatch || summary().totalMismatch) {
+            <p class="warning-text" role="status">
+              <mat-icon class="inline-icon">warning</mat-icon>
+              @if (summary().productsMismatch) {
+                O valor dos produtos difere da soma dos itens.
+              }
+              @if (summary().totalMismatch) {
+                O valor total difere de produtos − descontos + acréscimos.
+              }
+              Confira com a nota; divergências serão sinalizadas na confirmação.
+            </p>
+          }
+          @if (!form.controls.autoTotals.value) {
+            <button mat-button type="button" (click)="fillTotalsFromItems()">Preencher pelos itens</button>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Imagem da nota</mat-card-title>
+          <mat-card-subtitle>Opcional · JPEG, PNG ou WebP até 10 MB</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <input #fileInput type="file" hidden accept="image/jpeg,image/png,image/webp" (change)="onFileSelected($event)" />
+          @if (pendingImage(); as file) {
+            <p class="file-name">
+              <mat-icon class="inline-icon">image</mat-icon>
+              {{ file.name }}
+              <button mat-icon-button type="button" aria-label="Remover imagem selecionada" (click)="clearPendingImage()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </p>
+          } @else if (hasImage()) {
+            <p class="muted">Esta compra já possui imagem. Selecione outra para substituí-la.</p>
+          }
+          <button mat-stroked-button type="button" (click)="fileInput.click()">
+            <mat-icon>upload</mat-icon>
+            {{ pendingImage() || hasImage() ? 'Escolher outra imagem' : 'Selecionar imagem' }}
+          </button>
+          @if (imageError()) {
+            <p class="form-error image-error" role="alert">{{ imageError() }}</p>
+          }
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    @if (formError()) {
+      <p class="form-error" role="alert">{{ formError() }}</p>
+    }
+
+    <div class="form-actions">
+      <a mat-button [routerLink]="isEdit() ? ['/receipts', id()] : ['/receipts']">Cancelar</a>
+      @if (status() === 'Draft') {
+        <button mat-stroked-button type="submit" [disabled]="saving()">Salvar rascunho</button>
+        <button mat-flat-button type="button" [disabled]="saving()" (click)="save(true)">
+          <mat-icon>task_alt</mat-icon>
+          {{ saving() ? 'Salvando…' : 'Salvar e confirmar compra' }}
+        </button>
+      } @else {
+        <button mat-flat-button type="submit" [disabled]="saving()">{{ saving() ? 'Salvando…' : 'Salvar alterações' }}</button>
+      }
+    </div>
+  </form>
+}

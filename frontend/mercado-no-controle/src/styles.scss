@@ -75,7 +75,7 @@ body {
 }
 
 .cell-actions {
-  width: 104px;
+  width: 148px;
   text-align: right !important;
   white-space: nowrap;
 }
@@ -162,4 +162,55 @@ body {
   --mat-snack-bar-container-color: var(--mat-sys-error-container);
   --mat-snack-bar-supporting-text-color: var(--mat-sys-on-error-container);
   --mat-snack-bar-button-color: var(--mat-sys-on-error-container);
+}
+
+.status-badge--draft {
+  background: #fff3cd;
+  color: #7a5200;
+}
+
+.inline-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  vertical-align: text-bottom;
+}
+
+.warning-icon {
+  color: #b26a00;
+}
+
+.clickable-row {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-low);
+  }
+}
+
+.info-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.warning-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: #7a5200;
+}
+
+.filters__picker {
+  flex: 0 1 260px;
+}
+
+.filters__period {
+  flex: 0 1 260px;
 }

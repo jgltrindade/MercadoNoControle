@@ -235,6 +235,25 @@ public class PersistenceTests : IDisposable
     }
 
     [Fact]
+    public async Task Audit_dates_are_read_back_as_utc_while_purchase_dates_stay_local()
+    {
+        await using (var context = _database.CreateContext())
+        {
+            context.Receipts.Add(TestData.Receipt(TestData.Store()));
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = _database.CreateContext())
+        {
+            var receipt = await context.Receipts.Include(r => r.Store).SingleAsync();
+            Assert.Equal(DateTimeKind.Utc, receipt.CreatedAt.Kind);
+            Assert.Equal(DateTimeKind.Utc, receipt.Store.CreatedAt.Kind);
+            Assert.Equal(TestData.FixedNow, receipt.CreatedAt);
+            Assert.Equal(DateTimeKind.Unspecified, receipt.IssuedAt.Kind);
+        }
+    }
+
+    [Fact]
     public async Task Receipt_import_exists_without_a_receipt()
     {
         await using (var context = _database.CreateContext())

@@ -66,6 +66,18 @@ export interface ProductRequest {
   status: ProductStatus;
 }
 
+/** Produto associado a uma descrição de nota (resultado de /api/products/match). */
+export interface ProductMatch {
+  productId: number;
+  name: string;
+  brand: string | null;
+  unit: MeasurementUnit;
+  packageContent: number | null;
+  status: ProductStatus;
+  confirmed: boolean;
+  source: AliasSource;
+}
+
 export interface ProductQuery extends PageRequest {
   categoryId?: number | null;
   status?: ProductStatus | null;
@@ -102,6 +114,10 @@ export class ProductsService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.url}/${id}`);
+  }
+
+  match(description: string): Observable<ProductMatch[]> {
+    return this.http.get<ProductMatch[]>(`${this.url}/match`, { params: { description } });
   }
 
   addAlias(productId: number, description: string): Observable<ProductAlias> {

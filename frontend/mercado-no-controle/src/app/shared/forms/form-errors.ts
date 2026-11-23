@@ -15,6 +15,7 @@ export function fieldErrorMessage(control: AbstractControl | null): string | nul
   if (errors['decimalPlaces']) return `Use no máximo ${errors['decimalPlaces'].max} casas decimais.`;
   if (errors['cnpjFormat']) return 'O CNPJ deve ter 14 caracteres (com ou sem máscara).';
   if (errors['digits']) return 'Use somente números.';
+  if (errors['accessKeyFormat']) return 'A chave de acesso deve ter 44 caracteres.';
   return 'Valor inválido.';
 }
 
@@ -22,10 +23,14 @@ export function fieldErrorMessage(control: AbstractControl | null): string | nul
  * Aplica os erros por campo retornados pela API (ProblemDetails.errors) aos controles do
  * formulário. Retorna `true` se algum erro foi associado a um campo.
  */
-export function applyServerErrors(form: FormGroup, error: ApiError): boolean {
+export function applyServerErrors(
+  form: FormGroup,
+  error: ApiError,
+  fieldAliases: Record<string, string> = {},
+): boolean {
   let applied = false;
   for (const [field, messages] of Object.entries(error.fieldErrors)) {
-    const control = form.get(field);
+    const control = form.get(toControlPath(field, fieldAliases));
     if (control && messages.length > 0) {
       control.setErrors({ ...control.errors, server: messages.join(' ') });
       control.markAsTouched();
@@ -33,6 +38,17 @@ export function applyServerErrors(form: FormGroup, error: ApiError): boolean {
     }
   }
   return applied;
+}
+
+/**
+ * Converte o caminho de erro da API no caminho do controle. Ex.: "items[0].productId" com
+ * alias { productId: 'product' } → ['items', '0', 'product'].
+ */
+export function toControlPath(field: string, fieldAliases: Record<string, string> = {}): string[] {
+  return field
+    .replace(/\[(\d+)\]/g, '.$1')
+    .split('.')
+    .map((segment) => fieldAliases[segment] ?? segment);
 }
 
 /** Limita a quantidade de casas decimais de um número. */
@@ -57,6 +73,20 @@ export function cnpjFormat(control: AbstractControl): ValidationErrors | null {
     return null;
   }
   return /^[0-9A-Za-z]{12}[0-9]{2}$/.test(value.replace(/[./\-\s]/g, '')) ? null : { cnpjFormat: true };
+}
+
+/**
+ * Formato da chave de acesso (44 caracteres alfanuméricos, ignorando espaços).
+ * O dígito verificador é validado pelo backend.
+ */
+export function accessKeyFormat(control: AbstractControl): ValidationErrors | null {
+  const value = (control.value ?? '').toString();
+  if (!value.trim()) {
+    return null;
+  }
+  return /^[0-9A-Za-z]{44}$/.test(value.replace(/[^0-9A-Za-z]/g, '')) && !/[^0-9A-Za-z\s.\-/]/.test(value)
+    ? null
+    : { accessKeyFormat: true };
 }
 
 /** Somente dígitos. */

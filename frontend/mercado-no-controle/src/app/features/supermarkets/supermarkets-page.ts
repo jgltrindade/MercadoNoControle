@@ -14,6 +14,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, filter, switchMap } from 'rxjs';
 import { toApiError } from '../../core/api/api-error';
 import { NotificationService } from '../../core/services/notification.service';
@@ -43,6 +44,7 @@ import { BRAZILIAN_STATES, Store, StoreQuery, StoresService } from './stores.ser
     MatSortModule,
     MatTableModule,
     MatTooltipModule,
+    RouterLink,
     CnpjPipe,
     EmptyState,
     PageToolbar,

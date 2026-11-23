@@ -17,7 +17,7 @@ public sealed class GlobalExceptionHandler(
         var problem = exception switch
         {
             NotFoundException e => Create(StatusCodes.Status404NotFound, "Recurso não encontrado", e.Message),
-            ConflictException e => Create(StatusCodes.Status409Conflict, "Conflito", e.Message),
+            ConflictException e => CreateConflict(e),
             BusinessRuleException e => CreateBusinessRule(e),
             OperationCanceledException when httpContext.RequestAborted.IsCancellationRequested =>
                 Create(499, "Requisição cancelada", "A requisição foi cancelada pelo cliente."),
@@ -41,6 +41,17 @@ public sealed class GlobalExceptionHandler(
 
     private static ProblemDetails Create(int status, string title, string detail) =>
         new() { Status = status, Title = title, Detail = detail };
+
+    private static ProblemDetails CreateConflict(ConflictException exception)
+    {
+        var problem = Create(StatusCodes.Status409Conflict, "Conflito", exception.Message);
+        foreach (var (key, value) in exception.Extensions)
+        {
+            problem.Extensions[key] = value;
+        }
+
+        return problem;
+    }
 
     private static ProblemDetails CreateBusinessRule(BusinessRuleException exception)
     {

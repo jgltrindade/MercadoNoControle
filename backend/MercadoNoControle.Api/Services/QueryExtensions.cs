@@ -28,9 +28,11 @@ public static class QueryExtensions
         PageQuery page,
         IReadOnlyDictionary<string, Expression<Func<T, object?>>> sortFields,
         string defaultField,
-        Expression<Func<T, object?>> tieBreaker)
+        Expression<Func<T, object?>> tieBreaker,
+        bool defaultDescending = false)
     {
         var field = string.IsNullOrWhiteSpace(page.SortBy) ? defaultField : page.SortBy;
+        var descending = string.IsNullOrWhiteSpace(page.SortDirection) ? defaultDescending : page.Descending;
         if (!sortFields.TryGetValue(field, out var keySelector))
         {
             throw new BusinessRuleException(
@@ -41,8 +43,8 @@ public static class QueryExtensions
                 });
         }
 
-        var ordered = page.Descending ? query.OrderByDescending(keySelector) : query.OrderBy(keySelector);
-        return ordered.ThenBy(tieBreaker);
+        var ordered = descending ? query.OrderByDescending(keySelector) : query.OrderBy(keySelector);
+        return descending ? ordered.ThenByDescending(tieBreaker) : ordered.ThenBy(tieBreaker);
     }
 
     public static Dictionary<string, Expression<Func<T, object?>>> SortFields<T>() =>

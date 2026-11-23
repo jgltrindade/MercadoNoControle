@@ -1,0 +1,196 @@
+<a mat-button routerLink="/receipts" class="back-link">
+  <mat-icon>arrow_back</mat-icon>
+  Notas fiscais
+</a>
+
+@if (receiptResource.isLoading() && !receipt()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+@if (loadError(); as error) {
+  <mat-card appearance="outlined">
+    @if (error.status === 404) {
+      <app-empty-state icon="search_off" title="Compra não encontrada" message="A compra pode ter sido excluída.">
+        <a mat-flat-button routerLink="/receipts">Voltar às compras</a>
+      </app-empty-state>
+    } @else {
+      <app-empty-state icon="error" title="Não foi possível carregar a compra" [message]="error.message">
+        <button mat-stroked-button type="button" (click)="receiptResource.reload()">Tentar novamente</button>
+      </app-empty-state>
+    }
+  </mat-card>
+} @else if (receipt(); as receipt) {
+  <div class="details">
+    <mat-card appearance="outlined" class="details__header">
+      <mat-card-header>
+        <mat-card-title>{{ receipt.storeName }}</mat-card-title>
+        <mat-card-subtitle>
+          {{ receipt.issuedAt | date: "dd/MM/yyyy 'às' HH:mm" }}
+          @if (receipt.storeCnpj) {
+            · CNPJ {{ receipt.storeCnpj | cnpj }}
+          }
+        </mat-card-subtitle>
+        <span class="status-badge header-badge" [class.status-badge--draft]="receipt.status === 'Draft'">
+          {{ statusLabels[receipt.status] }}
+        </span>
+      </mat-card-header>
+      <mat-card-content>
+        @if (receipt.status === 'Draft') {
+          <p class="info-banner" role="note">
+            <mat-icon>info</mat-icon>
+            Rascunho: esta compra ainda não participa dos relatórios nem do histórico de preços.
+          </p>
+        }
+        <dl class="properties">
+          <dt>Número / série</dt>
+          <dd>{{ receipt.number ?? '—' }}{{ receipt.series ? ' / ' + receipt.series : '' }}</dd>
+          <dt>Chave de acesso</dt>
+          <dd class="access-key">{{ formattedAccessKey() ?? '—' }}</dd>
+          <dt>Pagamento</dt>
+          <dd>{{ receipt.paymentMethod ?? '—' }}</dd>
+          <dt>Registrada em</dt>
+          <dd>
+            {{ receipt.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+            @if (receipt.updatedAt) {
+              · alterada em {{ receipt.updatedAt | date: 'dd/MM/yyyy HH:mm' }}
+            }
+          </dd>
+        </dl>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <button mat-button type="button" (click)="delete()" [disabled]="busy()">
+          <mat-icon>delete</mat-icon>
+          Excluir
+        </button>
+        <a mat-stroked-button [routerLink]="['/receipts', receipt.id, 'edit']">
+          <mat-icon>edit</mat-icon>
+          Editar
+        </a>
+        @if (receipt.status === 'Draft') {
+          <button mat-flat-button type="button" (click)="confirmPurchase()" [disabled]="busy()">
+            <mat-icon>task_alt</mat-icon>
+            Confirmar compra
+          </button>
+        }
+      </mat-card-actions>
+    </mat-card>
+
+    @if (receipt.warnings.length || receipt.possibleDuplicates.length) {
+      <mat-card appearance="outlined" class="details__full warnings-card" role="region" aria-label="Alertas">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="warning-icon">warning</mat-icon>
+          <mat-card-title>Alertas</mat-card-title>
+          <mat-card-subtitle>Confira com a nota impressa. Os alertas não impedem o registro.</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <ul class="warning-list">
+            @for (warning of receipt.warnings; track warning.code + (warning.lineNumber ?? '')) {
+              <li>{{ warning.message }}</li>
+            }
+            @for (duplicate of receipt.possibleDuplicates; track duplicate.id) {
+              <li>
+                Possível duplicidade ({{ duplicate.reason.toLowerCase() }}):
+                <a class="link" [routerLink]="['/receipts', duplicate.id]">
+                  compra de {{ duplicate.issuedAt | date: 'dd/MM/yyyy HH:mm' }}, {{ duplicate.total | currency }}
+                </a>
+              </li>
+            }
+          </ul>
+        </mat-card-content>
+      </mat-card>
+    }
+
+    <mat-card appearance="outlined" class="details__full">
+      <mat-card-header>
+        <mat-card-title>Itens</mat-card-title>
+        <mat-card-subtitle>
+          {{ receipt.items.length }} item(ns)
+          @if (unidentifiedCount() > 0) {
+            · {{ unidentifiedCount() }} sem produto associado
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (receipt.items.length === 0) {
+          <p class="muted">Nenhum item cadastrado.</p>
+        } @else {
+          <div class="table-container">
+            <table mat-table [dataSource]="receipt.items" aria-label="Itens da compra">
+              <ng-container matColumnDef="line">
+                <th mat-header-cell *matHeaderCellDef>#</th>
+                <td mat-cell *matCellDef="let item" class="muted">{{ item.lineNumber }}</td>
+              </ng-container>
+              <ng-container matColumnDef="description">
+                <th mat-header-cell *matHeaderCellDef>Descrição / produto</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="cell-title">{{ item.description }}</div>
+                  @if (item.productId) {
+                    <a class="cell-subtitle link" [routerLink]="['/products', item.productId]">{{ item.productName }}</a>
+                  } @else {
+                    <span class="cell-subtitle unidentified">Produto não identificado</span>
+                  }
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="quantity">
+                <th mat-header-cell *matHeaderCellDef class="cell-number">Qtd.</th>
+                <td mat-cell *matCellDef="let item" class="cell-number nowrap">
+                  {{ item.quantity | number: '1.0-4' }} {{ item.unit ?? '' }}
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="unitPrice">
+                <th mat-header-cell *matHeaderCellDef class="cell-number">Preço unit.</th>
+                <td mat-cell *matCellDef="let item" class="cell-number nowrap">{{ item.unitPrice | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="discount">
+                <th mat-header-cell *matHeaderCellDef class="cell-number">Desconto</th>
+                <td mat-cell *matCellDef="let item" class="cell-number nowrap">{{ item.discount ? (item.discount | currency) : '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="total">
+                <th mat-header-cell *matHeaderCellDef class="cell-number">Total</th>
+                <td mat-cell *matCellDef="let item" class="cell-number nowrap cell-title">{{ item.total | currency }}</td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="columns"></tr>
+              <tr mat-row *matRowDef="let row; columns: columns"></tr>
+            </table>
+          </div>
+        }
+
+        <dl class="totals">
+          <dt>Valor dos produtos</dt>
+          <dd>{{ receipt.productsTotal | currency }}</dd>
+          <dt>Descontos</dt>
+          <dd>− {{ receipt.discountTotal | currency }}</dd>
+          <dt>Acréscimos</dt>
+          <dd>+ {{ receipt.additionalCharges | currency }}</dd>
+          <dt class="totals__grand">Total</dt>
+          <dd class="totals__grand">{{ receipt.total | currency }}</dd>
+        </dl>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="details__full">
+      <mat-card-header>
+        <mat-card-title>Imagem da nota</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <input #imageInput type="file" hidden accept="image/jpeg,image/png,image/webp" (change)="onImageSelected($event)" />
+        @if (imageUrl(); as url) {
+          <a [href]="url" target="_blank" rel="noopener" class="image-link" title="Abrir imagem original">
+            <img [src]="url" alt="Imagem da nota fiscal" class="receipt-image" />
+          </a>
+        } @else {
+          <p class="muted">Nenhuma imagem anexada.</p>
+        }
+      </mat-card-content>
+      <mat-card-actions align="end">
+        @if (receipt.hasImage) {
+          <button mat-button type="button" (click)="removeImage()" [disabled]="busy()">Remover</button>
+        }
+        <button mat-stroked-button type="button" (click)="imageInput.click()" [disabled]="busy()">
+          <mat-icon>upload</mat-icon>
+          {{ receipt.hasImage ? 'Substituir imagem' : 'Anexar imagem' }}
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+}

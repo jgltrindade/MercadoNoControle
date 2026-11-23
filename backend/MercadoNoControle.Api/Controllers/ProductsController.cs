@@ -18,6 +18,11 @@ public class ProductsController(IProductService productService) : ControllerBase
     public Task<PagedResult<ProductListItem>> List([FromQuery] ProductQuery query, CancellationToken cancellationToken) =>
         productService.ListAsync(query, cancellationToken);
 
+    /// <summary>Produtos associados a uma descrição de nota fiscal (sugestão de associação de itens).</summary>
+    [HttpGet("match")]
+    public Task<IReadOnlyList<ProductMatch>> Match([FromQuery] string description, CancellationToken cancellationToken) =>
+        productService.MatchAsync(description, cancellationToken);
+
     /// <summary>Detalhes do produto, incluindo descrições alternativas.</summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -6,6 +6,7 @@ import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angula
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
 import { AppTitleStrategy } from './core/layout/app-title.strategy';
+import { providePtBrDateAdapter } from './core/i18n/date-adapter';
 
 describe('App routing', () => {
   let harness: RouterTestingHarness;
@@ -18,6 +19,7 @@ describe('App routing', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: TitleStrategy, useExisting: AppTitleStrategy },
+        providePtBrDateAdapter(),
       ],
     });
     harness = await RouterTestingHarness.create();

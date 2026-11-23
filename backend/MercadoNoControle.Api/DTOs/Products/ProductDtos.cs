@@ -71,6 +71,17 @@ public sealed class ProductAliasRequest
     public string Description { get; set; } = string.Empty;
 }
 
+/// <summary>Produto cuja descrição alternativa corresponde exatamente (forma normalizada) à descrição da nota.</summary>
+public sealed record ProductMatch(
+    int ProductId,
+    string Name,
+    string? Brand,
+    MeasurementUnit Unit,
+    decimal? PackageContent,
+    ProductStatus Status,
+    bool Confirmed,
+    AliasSource Source);
+
 public sealed class ProductQuery : PageQuery
 {
     public int? CategoryId { get; set; }

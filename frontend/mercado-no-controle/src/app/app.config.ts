@@ -10,6 +10,7 @@ import {
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { MatIconRegistry } from '@angular/material/icon';
+import { providePtBrDateAdapter } from './core/i18n/date-adapter';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 import { PtBrPaginatorIntl } from './core/i18n/paginator-intl';
 import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angular/router';
@@ -27,6 +28,7 @@ export const appConfig: ApplicationConfig = {
     { provide: LOCALE_ID, useValue: 'pt-BR' },
     { provide: DEFAULT_CURRENCY_CODE, useValue: 'BRL' },
     { provide: MatPaginatorIntl, useClass: PtBrPaginatorIntl },
+    providePtBrDateAdapter(),
     provideAppInitializer(() => {
       inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined');
     }),

@@ -21,7 +21,7 @@ describe('toApiError', () => {
       }),
     );
 
-    expect(error).toEqual({
+    expect(error).toMatchObject({
       status: 422,
       message: 'O total da nota não confere.',
       fieldErrors: { total: ['Valor divergente.'] },

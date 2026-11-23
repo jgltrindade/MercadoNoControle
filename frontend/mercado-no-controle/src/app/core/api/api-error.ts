@@ -8,6 +8,8 @@ export interface ProblemDetails {
   detail?: string;
   traceId?: string;
   errors?: Record<string, string[]>;
+  /** Extensões específicas do recurso (ex.: `warnings`, `possibleDuplicates`). */
+  [extension: string]: unknown;
 }
 
 /** Erro normalizado para exibição na interface. */
@@ -15,6 +17,8 @@ export interface ApiError {
   status: number;
   message: string;
   fieldErrors: Record<string, string[]>;
+  /** Corpo ProblemDetails original, quando houver (para ler extensões). */
+  problem?: ProblemDetails;
 }
 
 const CONNECTION_ERROR_MESSAGE = 'Não foi possível conectar ao servidor. Verifique se a API está em execução.';
@@ -40,6 +44,7 @@ export function toApiError(error: unknown): ApiError {
     status: error.status,
     message: problem?.detail ?? problem?.title ?? GENERIC_ERROR_MESSAGE,
     fieldErrors: problem?.errors ?? {},
+    problem,
   };
 }
 

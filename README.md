@@ -71,6 +71,7 @@ npx ng test --watch=false
 | `Storage:DatabasePath` | `Storage__DatabasePath` | `../../data/mercado-no-controle.db` |
 | `Storage:UploadsPath` | `Storage__UploadsPath` | `../../uploads` |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | `http://localhost:4200` |
+| `Uploads:MaxImageSizeBytes` | `Uploads__MaxImageSizeBytes` | `10485760` (10 MB) |
 
 Caminhos relativos são resolvidos a partir do diretório do projeto da API. Chaves de API (provedor de IA, Fase 4) serão configuradas somente no backend, por variável de ambiente ou *user-secrets* — nunca no Angular nem em arquivos versionados.
 

@@ -1,8 +1,8 @@
 # Status de Desenvolvimento — Mercado no Controle
 
 **Última atualização:** 2026-11-23
-**Fase atual:** Fase 2 — Cadastros ✅ concluída
-**Próxima etapa:** Fase 3 — Compras
+**Fase atual:** Fase 3 — Compras ✅ concluída
+**Próxima etapa:** Fase 4 — Inteligência artificial
 
 ---
 
@@ -12,8 +12,8 @@
 |---|---|---|
 | 1 | Fundação | ✅ Concluída |
 | 2 | Cadastros (supermercados, categorias, produtos, descrições alternativas) | ✅ Concluída |
-| 3 | Compras (cadastro manual, itens, upload de imagens, duplicidade) | ⏳ Próxima |
-| 4 | Inteligência artificial (`IReceiptReader`, conferência, confirmação) | Pendente |
+| 3 | Compras (cadastro manual, itens, upload de imagens, duplicidade) | ✅ Concluída |
+| 4 | Inteligência artificial (`IReceiptReader`, conferência, confirmação) | ⏳ Próxima |
 | 5 | Histórico de preços (registro, normalização, comparação, gráficos) | Pendente |
 | 6 | Dashboard e relatórios (indicadores, filtros, exportações) | Pendente |
 | 7 | Qualidade e entrega (autenticação, backup, segurança, publicação) | Pendente |
@@ -69,24 +69,58 @@
 - **Produtos**: busca, filtros por categoria e situação, ordenação e paginação no servidor, formulário em diálogo; após criar, abre os detalhes.
 - **Detalhes do produto** (`/products/:id`): dados do cadastro, edição/exclusão, gestão de descrições alternativas (adicionar, confirmar sugestão, remover), estado "não encontrado"; espaço reservado para o histórico de preços (Fase 5).
 
+### Fase 3 — Compras
+
+**Backend**
+- **Notas fiscais** — `GET/POST /api/receipts`, `GET/PUT/DELETE /api/receipts/{id}`, `PUT /api/receipts/{id}/confirm`:
+  - Cadastro manual cria um **rascunho**; somente a confirmação explícita registra a compra (RN01).
+  - Listagem paginada com busca (número, chave de acesso, supermercado), filtros por supermercado, situação e período (`from`/`to`, inclusive) e ordenação (padrão: mais recentes primeiro).
+  - Itens incluídos, alterados (pelo `id`) e removidos na mesma requisição; a descrição original da nota é preservada.
+  - Validação de referências (supermercado e produtos existentes → 422; item de outra nota → 422).
+- **Consistência dos valores (RN10)** — `ReceiptConsistency`: total do item, soma dos itens × valor dos produtos, descontos dos itens × desconto da nota, total × produtos − descontos + acréscimos (tolerância de R$ 0,01), e CNPJ da chave de acesso × CNPJ do supermercado. Os alertas acompanham os detalhes da nota.
+- **Duplicidade (RN02)** — chave de acesso validada (44 caracteres, dígito verificador, aceita CNPJ alfanumérico) e única: bloqueia (409 com `existingReceiptId`). Sem chave, notas confirmadas do mesmo supermercado com mesmo número e série, ou mesma data e mesmo total, são **possíveis duplicatas** — só alertam.
+- **Confirmação** — transacional; com alertas, responde 409 com `warnings` e `possibleDuplicates` até o usuário confirmar com `acknowledgeWarnings: true`. Exige ao menos um item.
+- **Histórico de preços (RN03, RN04, RN05)** — `PriceObservationRecorder` mantém uma observação por item confirmado e associado a produto; editar uma compra confirmada atualiza apenas as observações dela; excluir remove itens e observações em cascata. O preço normalizado fica para a Fase 5.
+- **Associação de itens** — ao confirmar, cada associação item → produto vira descrição alternativa confirmada (origem: nota fiscal). `GET /api/products/match?description=` devolve os produtos associados a uma descrição (base da sugestão automática).
+- **Imagens** — `POST/GET/DELETE /api/receipts/{id}/image`: JPEG, PNG ou WebP identificados pela assinatura do arquivo (não pelo nome/cabeçalho), até 10 MB (configurável em `Uploads:MaxImageSizeBytes`), nome gerado pelo servidor em `uploads/receipts/AAAA/MM/`, proteção contra caminhos fora do diretório, `X-Content-Type-Options: nosniff`.
+- `ConflictException` passou a levar extensões no ProblemDetails.
+- Datas de auditoria (`CreatedAt`, `UpdatedAt`, `ProcessedAt`) voltam do SQLite marcadas como UTC (sufixo "Z" no JSON).
+
+**Frontend**
+- `SearchPicker`: seletor com busca no servidor, usado como controle de formulário, com opção "cadastrar novo".
+- **Notas fiscais** (`/receipts`): busca, filtro por supermercado (também via `?storeId=`, a partir de "Ver compras" em Supermercados), período (datepicker em pt-BR), situação, ordenação e paginação; indicação de itens sem produto e de imagem anexada; exclusão com confirmação.
+- **Nova compra / edição** (`/receipts/new`, `/receipts/:id/edit`):
+  - Dados da nota, itens com total calculado (quantidade × preço − desconto) e totais calculados a partir dos itens (desligável para digitar os valores impressos).
+  - Resumo com divergências em tempo real.
+  - Sugestão automática do produto pela descrição (somente com associação única e confirmada; ambiguidade é sinalizada).
+  - Cadastro rápido de supermercado/produto sem sair da tela; imagem opcional.
+  - "Salvar rascunho" ou "Salvar e confirmar compra"; os alertas do backend aparecem em diálogo antes de confirmar. Erros do backend aparecem nos campos, inclusive nos itens.
+- **Detalhes da compra** (`/receipts/:id`): cabeçalho, situação, alertas e possíveis duplicatas (com links), itens com produto ou "não identificado", totais, imagem (anexar, substituir, remover) e ações de editar, confirmar e excluir.
+- Adaptador de datas pt-BR (`dd/MM/aaaa` digitado corretamente).
+
 ## 4. Testes executados (2026-11-23)
 
 | Suíte | Resultado |
 |---|---|
-| Backend — `dotnet test` | **120 aprovados**, 0 falhas |
-| Frontend — `ng test` (Vitest) | **76 aprovados**, 0 falhas |
-| Build de produção Angular | OK (inicial ≈ 777 kB, ≈ 164 kB transferidos) |
+| Backend — `dotnet test` | **160 aprovados**, 0 falhas |
+| Frontend — `ng test` (Vitest) | **117 aprovados**, 0 falhas |
+| Build de produção Angular | OK (inicial ≈ 792 kB, ≈ 167 kB transferidos) |
 | Verificação manual no navegador | Ver abaixo |
 
 **Backend — cobertura acumulada**
 - Fase 1: conversões escaladas, persistência com as migrations reais, integridade referencial, cascata, health check, CORS.
 - Fase 2: validadores (CNPJ numérico/alfanumérico, GTIN, UF, casas decimais), normalização de texto; serviços de categorias, supermercados e produtos (normalização, unicidade, busca, filtros, ordenação, paginação, curingas literais, indicadores só com compras confirmadas e somas exatas, bloqueio de exclusão, descrições alternativas); endpoints HTTP de ponta a ponta (201/204/400/404/409/422, erros por campo em camelCase, parâmetros de paginação inválidos, ordenação desconhecida, enum inválido).
+- Fase 3: chave de acesso (formato, DV, CNPJ); consistência dos valores (todos os alertas, tolerância de truncamento, desconto geral e acréscimos); serviço de compras (rascunho sem histórico, referências inválidas, chave duplicada, confirmação exige itens, alertas exigem ciência, possíveis duplicatas sem bloqueio e só no mesmo supermercado, histórico gerado só para itens associados, descrições aprendidas, edição preservando ids e ressincronizando o histórico, associação posterior, exclusão removendo histórico, indicadores do supermercado, filtros/período/ordenação, imagem); armazenamento de imagens (assinatura, vazio, tamanho, fluxo maior que o declarado, caminho fora do diretório); endpoints (fluxo completo com 409 de alertas, erros por item, upload multipart, rejeição de arquivo falso, imagem servida com `nosniff`); datas de auditoria em UTC.
 
 **Frontend — cobertura acumulada**
 - Fase 1: roteamento e títulos, `HealthService`, `toApiError`, indicador da API, layout, página provisória.
 - Fase 2: serviços HTTP (URLs, métodos, corpo e query string), helpers de formulário e utilitários, página de categorias (carregamento, tabela, vazio, erro + nova tentativa, exclusão com confirmação), página de supermercados (parâmetros, formatação de CNPJ/moeda/data, *debounce*, filtro, ordenação, paginação, erro), formulário de supermercado (obrigatórios, formato de CNPJ, nulos, erros do backend nos campos, 409, edição), formulário de produto (padrões, casas decimais, código de barras, payload, 409, erro geral), detalhes do produto (dados, descrições, adicionar, duplicidade, confirmar, 404).
+- Fase 3: arredondamento e total do item, mapeamento de caminhos de erro, formato da chave, adaptador de datas, serviço HTTP de compras (inclusive upload), fluxo de confirmação com alertas (aceitar, recusar, outros erros), `SearchPicker` (busca, seleção, limpeza ao digitar, cadastrar novo, desabilitado), listagem (ordenação padrão, filtro inicial por supermercado, situação, período, vazio, erro, exclusão), formulário (cálculos, divergência, sugestão única e ambígua, validação, data/hora sem fuso, rascunho, confirmação aceita e recusada com atualização na nova tentativa, erros nos itens, chave duplicada, imagem inválida e envio após salvar, edição preservando totais impressos, 404), detalhes (dados, alertas, itens não identificados, confirmação, remoção de imagem, 404).
 
-**Verificação manual (navegador)**: listagem de categorias; cadastro de supermercado com CNPJ inválido (erro do backend exibido no campo) e depois válido; cadastro de produto com categoria, unidade e conteúdo, com redirecionamento aos detalhes; inclusão de descrição alternativa e rejeição de equivalente com acento/caixa diferentes; paginador em português; layout a 375 px. Os registros criados na verificação foram excluídos do banco local.
+**Verificação manual (navegador)**
+- Fase 2: listagem de categorias; cadastro de supermercado com CNPJ inválido (erro do backend exibido no campo) e depois válido; cadastro de produto com redirecionamento aos detalhes; inclusão de descrição alternativa e rejeição de equivalente com acento/caixa diferentes; paginador em português; layout a 375 px.
+- Fase 3: nova compra com seletor de supermercado por busca; descrição "leite int 1l" associada automaticamente ao produto; total do item e totais da nota calculados; total divergente digitado → aviso em tempo real → diálogo com o alerta do backend → confirmação; detalhes com alertas, item não identificado e imagem anexada; listagem filtrada por `?storeId=`; edição carregando a compra confirmada. Corrigido durante a verificação: horários de auditoria exibidos 3 h adiantados (datas UTC sem "Z").
+- Os registros e a imagem criados nas verificações foram excluídos do banco e da pasta de uploads locais.
 
 ## 5. Decisões técnicas
 
@@ -117,22 +151,33 @@
 | D23 | **`[Range]` decimal com cultura invariante** (`ParseLimitsInInvariantCulture`). | Corrige erro 500 encontrado nos testes: em máquinas pt-BR, "0.0001" não era interpretado. |
 | D24 | **Frontend: `rxResource`** (API pública no Angular 22) para dados de leitura; mutações por `subscribe` nos serviços; formulários reativos; sem NgRx. | Signals conforme a especificação, sem estado global. |
 | D25 | **Validação no frontend só de formato** (obrigatório, tamanho, máscara de CNPJ, dígitos, casas decimais). Dígitos verificadores e unicidade ficam no backend, cujos erros são exibidos nos campos. | Não duplicar regras de negócio (seção 15). |
+| D26 | **Valores da nota são os impressos.** O backend não recalcula nem corrige totais: compara e gera alertas (RN10). O frontend apenas pré-preenche valores calculados, que o usuário pode alterar. | Não inventar dados; a nota é a fonte. |
+| D27 | **Fórmulas de consistência**: item = arred(qtd × preço, 2) − desconto; valor dos produtos = Σ (total + desconto dos itens); desconto da nota ≥ Σ descontos dos itens (permite desconto geral); total = produtos − descontos + acréscimos. Tolerância de R$ 0,01 (notas que truncam). | Estrutura usual de NFC-e (vProd, vDesc, vOutro, vNF). |
+| D28 | **Alertas exigem ciência, não bloqueiam**: divergências e possíveis duplicatas retornam 409 na confirmação até `acknowledgeWarnings: true`. Somente a chave de acesso repetida bloqueia. | RN02 ("não bloquear compras legítimas") com decisão do usuário registrada. |
+| D29 | **Fluxo manual = rascunho + confirmação** (`POST` e depois `PUT .../confirm`). Se o usuário recusar os alertas, a compra fica como rascunho, visível na listagem. | Endpoints da especificação; RN01. |
+| D30 | **Histórico de preços gerado já na Fase 3**, sem preço normalizado. A Fase 5 adiciona a normalização e recalcula as observações existentes. | Mantém RN03/RN04/RN05 consistentes desde a primeira compra, sem migração de dados depois. |
+| D31 | **Descrições aprendidas na confirmação**: associação item → produto feita pelo usuário vira descrição alternativa confirmada (origem `Receipt`). A sugestão automática no frontend só preenche quando há exatamente uma associação confirmada e ativa. | Associações ambíguas devem ser confirmadas pelo usuário (4.4). |
+| D32 | **Imagens nunca são apagadas pela aplicação**: remover/substituir a imagem ou excluir a nota apenas desvincula. O gerenciamento de arquivos órfãos fica para Configurações (Fase 7). | "Preservar imagens originais" (6.3); evita perda acidental. |
+| D33 | **Datas de auditoria lidas como UTC** por conversor no `AppDbContext` (`CreatedAt`, `UpdatedAt`, `ProcessedAt`). | Sem o "Z", o navegador exibia o horário UTC como local. |
+| D34 | **Chave de acesso com CNPJ alfanumérico**: posições 7–20 aceitam `[0-9A-Z]`; DV por módulo 11 com valor = ASCII − 48 (mesma regra do CNPJ alfanumérico). | Notas de emitentes com CNPJ alfanumérico. |
 
 ## 6. Funcionalidades pendentes
 
-- Fase 3: cadastro manual de compras (nota + itens), associação de itens a produtos (por descrição alternativa e escolha manual), validação dos totais (RN10), detecção de duplicidade (RN02), upload e armazenamento de imagens, listagem/detalhes/edição/exclusão de notas, histórico de compras do supermercado.
-- Fases 4 a 7: conforme a tabela da seção 1.
+- Fase 4: integração com IA (leitura da imagem, conferência, confirmação).
+- Fases 5 a 7: conforme a tabela da seção 1.
 
 ## 7. Problemas conhecidos
 
 - Nenhum problema crítico.
 - A busca textual usa `LIKE` do SQLite, que ignora maiúsculas/minúsculas apenas em ASCII: "laticinios" não encontra "Laticínios" pelo nome (a busca por descrições alternativas já ignora acentos). Avaliar uma coluna normalizada de busca se isso incomodar no uso.
 - A ordenação alfabética do SQLite é binária: nomes iniciados por letra acentuada (ex.: "Água") aparecem depois do "Z".
-- O bundle inicial cresceu para ≈ 777 kB (≈ 164 kB transferidos) com os componentes Material compartilhados; ainda abaixo do limite de aviso (1 MB). Revisar na Fase 7.
+- O bundle inicial está em ≈ 792 kB (≈ 167 kB transferidos), abaixo do limite de aviso (1 MB). Revisar na Fase 7.
 - Fontes e ícones vêm do Google Fonts; sem internet, a interface usa fontes de reserva.
 - A API ainda não tem autenticação (D12).
+- Imagens desvinculadas ou de notas excluídas permanecem em `uploads/` (D32) até existir o gerenciamento de imagens (Fase 7).
+- Os campos numéricos usam `<input type="number">`: o separador decimal exibido depende do navegador (ponto ou vírgula).
 
-## 8. Próxima etapa — Fase 3 (Compras)
+## 8. Próxima etapa — Fase 4 (Inteligência artificial)
 
-1. Backend: DTOs de nota e itens; `ReceiptService` com criação manual transacional, validação de totais (RN10, com tolerância de arredondamento), alerta de duplicidade (chave de acesso bloqueia; sem chave, aviso por supermercado + data + valor), edição e exclusão consistentes (RN04, RN05), sugestão de produto por descrição alternativa; upload de imagem (tipo/tamanho) para `uploads/`; endpoints `/api/receipts`; testes.
-2. Frontend: listagem de notas com filtros; tela "Nova compra" (cadastro manual com itens, totais calculados e divergências sinalizadas); detalhes da nota com imagem; edição e exclusão; testes.
+1. Backend: `IReceiptReader` e `ReceiptExtractionResult` (contrato da seção 5.3, campos ausentes como nulos); implementação de um provedor multimodal configurável, com chave só no backend; `POST /api/receipts/upload` criando a `ReceiptImport` (imagem validada e armazenada, estado próprio); processamento com tratamento de imagem ilegível, timeout, JSON inválido e dados incompletos; validação do resultado (CNPJ, chave, totais) e identificação do supermercado (`FindByCnpjAsync`) e dos produtos (`match`); `GET /api/receipts/imports/{importId}`, reprocessamento e descarte; confirmação criando a nota em transação pelo mesmo fluxo da Fase 3; sem chave configurada, o upload informa que a leitura está indisponível e o cadastro manual segue funcionando; testes com leitor falso isolado nos testes.
+2. Frontend: envio da foto em "Nova compra", acompanhamento do processamento, tela de conferência reutilizando o formulário de compra pré-preenchido, confirmação; testes.

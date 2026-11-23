@@ -5,6 +5,7 @@ import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@a
 import { LOCALE_ID, DEFAULT_CURRENCY_CODE } from '@angular/core';
 import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
+import { provideRouter } from '@angular/router';
 import { PagedResult } from '../../shared/models/paging';
 import { Store } from './stores.service';
 import { SupermarketsPage } from './supermarkets-page';
@@ -44,6 +45,7 @@ describe('SupermarketsPage', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideRouter([]),
         { provide: LOCALE_ID, useValue: 'pt-BR' },
         { provide: DEFAULT_CURRENCY_CODE, useValue: 'BRL' },
       ],

@@ -1,0 +1,85 @@
+.back-link {
+  margin-bottom: 8px;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header-badge {
+  margin-left: auto;
+  align-self: flex-start;
+}
+
+.properties {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 24px;
+  margin: 16px 0 0;
+
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.access-key {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.warnings-card {
+  border-color: #e0a800;
+}
+
+.warning-list {
+  margin: 0;
+  padding-left: 20px;
+
+  li {
+    margin-bottom: 6px;
+  }
+}
+
+.unidentified {
+  color: #b26a00;
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: end;
+  gap: 4px 24px;
+  margin: 16px 0 0;
+
+  dt {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  dd {
+    margin: 0;
+    text-align: right;
+  }
+}
+
+.totals__grand {
+  font: var(--mat-sys-title-medium);
+  color: var(--mat-sys-on-surface) !important;
+}
+
+.image-link {
+  display: inline-block;
+}
+
+.receipt-image {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+}

@@ -9,6 +9,8 @@ export interface ConfirmDialogData {
   confirmLabel?: string;
   /** Destaca o botão de confirmação como ação destrutiva. */
   destructive?: boolean;
+  /** Lista de detalhes exibida abaixo da mensagem (ex.: alertas). */
+  details?: string[];
 }
 
 @Component({
@@ -19,6 +21,13 @@ export interface ConfirmDialogData {
     <h2 mat-dialog-title>{{ data.title }}</h2>
     <mat-dialog-content>
       <p>{{ data.message }}</p>
+      @if (data.details?.length) {
+        <ul class="details">
+          @for (detail of data.details; track $index) {
+            <li>{{ detail }}</li>
+          }
+        </ul>
+      }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button type="button" [mat-dialog-close]="false">Cancelar</button>
@@ -35,6 +44,8 @@ export interface ConfirmDialogData {
     </mat-dialog-actions>
   `,
   styles: `
+    .details { margin: 0; padding-left: 20px; color: var(--mat-sys-on-surface-variant); }
+    .details li { margin-bottom: 4px; }
     .destructive {
       --mat-button-filled-container-color: var(--mat-sys-error);
       --mat-button-filled-label-text-color: var(--mat-sys-on-error);
