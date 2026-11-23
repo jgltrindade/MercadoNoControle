@@ -14,6 +14,7 @@ import { providePtBrDateAdapter } from './core/i18n/date-adapter';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 import { PtBrPaginatorIntl } from './core/i18n/paginator-intl';
 import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideEchartsCore } from 'ngx-echarts';
 import { routes } from './app.routes';
 import { AppTitleStrategy } from './core/layout/app-title.strategy';
 
@@ -29,6 +30,7 @@ export const appConfig: ApplicationConfig = {
     { provide: DEFAULT_CURRENCY_CODE, useValue: 'BRL' },
     { provide: MatPaginatorIntl, useClass: PtBrPaginatorIntl },
     providePtBrDateAdapter(),
+    provideEchartsCore({ echarts: () => import('./core/charts/echarts').then((m) => m.echarts) }),
     provideAppInitializer(() => {
       inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined');
     }),

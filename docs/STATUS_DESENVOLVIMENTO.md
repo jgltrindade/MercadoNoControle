@@ -1,8 +1,9 @@
 # Status de Desenvolvimento — Mercado no Controle
 
 **Última atualização:** 2026-11-23
-**Fase atual:** Fase 4 — Inteligência artificial ✅ concluída (leitura real pendente de validação com chave configurada — ver seção 7)
-**Próxima etapa:** Fase 5 — Histórico de preços
+**Fase atual:** Fase 5 — Histórico de preços ✅ concluída
+**Próxima etapa:** Fase 6 — Dashboard e relatórios
+**Pendência registrada:** validar a leitura real por IA com uma chave configurada (seção 7).
 
 ---
 
@@ -14,8 +15,8 @@
 | 2 | Cadastros (supermercados, categorias, produtos, descrições alternativas) | ✅ Concluída |
 | 3 | Compras (cadastro manual, itens, upload de imagens, duplicidade) | ✅ Concluída |
 | 4 | Inteligência artificial (`IReceiptReader`, conferência, confirmação) | ✅ Concluída |
-| 5 | Histórico de preços (registro, normalização, comparação, gráficos) | ⏳ Próxima |
-| 6 | Dashboard e relatórios (indicadores, filtros, exportações) | Pendente |
+| 5 | Histórico de preços (registro, normalização, comparação, gráficos) | ✅ Concluída |
+| 6 | Dashboard e relatórios (indicadores, filtros, exportações) | ⏳ Próxima |
 | 7 | Qualidade e entrega (autenticação, backup, segurança, publicação) | Pendente |
 
 ## 2. Ambiente verificado
@@ -122,13 +123,37 @@
   - Em falha: "Tentar ler novamente", "Cadastrar manualmente com esta imagem" ou "Descartar".
 - O formulário de compra passou a usar *container queries* (adapta-se à largura disponível, inclusive na coluna da conferência).
 
+### Fase 5 — Histórico de preços
+
+**Backend**
+- **Preço normalizado (RN08)** — `PriceNormalizer`: preço por kg, litro ou unidade = total pago pelo item ÷ medida comprada.
+  - Item vendido por peso/volume (unidade da nota KG/G/L/ML e variações como "GR", "LT"): a quantidade já é a medida.
+  - Item vendido por embalagem: medida = quantidade × conteúdo da embalagem do produto (G→kg, ML→L, DZ→12 un).
+  - Não normaliza com conteúdo desconhecido, unidades incompatíveis ou produtos em CX/PCT. Arredondamento explícito a 4 casas.
+- **Registro automático** — `PriceObservationRecorder` grava o preço normalizado ao confirmar/editar compras. Alterar unidade ou conteúdo de um produto recalcula só o histórico dele, na mesma transação. Na inicialização, um recálculo idempotente atualiza observações antigas (D30).
+- **`GET /api/products/{id}/prices`** (`from`, `to`, `storeId`): compras do produto com preço pago efetivo (total ÷ quantidade, considera descontos) e normalizado. Indicadores calculados em `decimal`: último, menor, maior (com data e loja), médio, variação % entre a primeira e a última compra do período e, quando todas as compras têm a mesma unidade-base, último/menor/médio normalizados.
+- **`GET /api/products/{id}/comparison`**: por supermercado, último/menor/médio preço e diferença % para o mais barato; e, para referência, produtos **da mesma categoria** com preço normalizado na **mesma unidade-base** (não compartilham histórico — RN07).
+- **Associação posterior de itens (RN06)**:
+  - `GET /api/price-history/unassigned-items` agrupa itens de compras confirmadas sem produto pela descrição normalizada (ocorrências, total, lojas, sugestão quando há uma descrição alternativa confirmada única).
+  - `POST /api/price-history/assign` associa todos os itens do grupo ao produto em uma transação, gera o histórico e registra a descrição alternativa.
+
+**Frontend**
+- Apache ECharts 6 + ngx-echarts 22, carregados sob demanda somente com os módulos usados (linha, barra, grade, legenda, tooltip): ≈ 160 kB transferidos, apenas quando um gráfico aparece.
+- **Histórico de preços** (`/price-history?productId=`):
+  - Busca de produto e período (3, 6, 12 meses ou todo).
+  - Indicadores e evolução do preço em linha, uma série por supermercado, com alternância "Preço pago" / "Por kg/L/un" quando todas as compras são normalizáveis.
+  - Comparação entre supermercados em barras com tabela, produtos da mesma categoria e tabela das compras com links para as notas.
+  - Seção "Itens sem produto" com diálogo de associação (com cadastro rápido de produto).
+- **Detalhes do produto**: resumo do histórico (indicadores) e link para a evolução completa.
+- Gráficos seguem as diretrizes de visualização: paleta categórica validada para daltonismo em ordem fixa, cor atrelada à loja (não ao ranking), eixo único, linhas de 2 px com marcadores ≥ 8 px, legenda quando há mais de uma série e rótulo direto até 4 séries, rótulo apenas no menor preço das barras, tooltip, descrição acessível e tabela com os mesmos dados.
+
 ## 4. Testes executados (2026-11-23)
 
 | Suíte | Resultado |
 |---|---|
-| Backend — `dotnet test` | **199 aprovados**, 0 falhas |
-| Frontend — `ng test` (Vitest) | **134 aprovados**, 0 falhas |
-| Build de produção Angular | OK (inicial ≈ 792 kB, ≈ 167 kB transferidos) |
+| Backend — `dotnet test` | **227 aprovados**, 0 falhas |
+| Frontend — `ng test` (Vitest) | **146 aprovados**, 0 falhas |
+| Build de produção Angular | OK (inicial ≈ 802 kB, ≈ 169 kB transferidos; ECharts em chunk sob demanda ≈ 160 kB) |
 | Verificação manual no navegador | Ver abaixo |
 | Chamada real à API da Anthropic | **Não executada** — não há chave configurada neste ambiente (seção 7) |
 
@@ -137,17 +162,20 @@
 - Fase 2: validadores (CNPJ numérico/alfanumérico, GTIN, UF, casas decimais), normalização de texto; serviços de categorias, supermercados e produtos (normalização, unicidade, busca, filtros, ordenação, paginação, curingas literais, indicadores só com compras confirmadas e somas exatas, bloqueio de exclusão, descrições alternativas); endpoints HTTP de ponta a ponta (201/204/400/404/409/422, erros por campo em camelCase, parâmetros de paginação inválidos, ordenação desconhecida, enum inválido).
 - Fase 3: chave de acesso (formato, DV, CNPJ); consistência dos valores (todos os alertas, tolerância de truncamento, desconto geral e acréscimos); serviço de compras (rascunho sem histórico, referências inválidas, chave duplicada, confirmação exige itens, alertas exigem ciência, possíveis duplicatas sem bloqueio e só no mesmo supermercado, histórico gerado só para itens associados, descrições aprendidas, edição preservando ids e ressincronizando o histórico, associação posterior, exclusão removendo histórico, indicadores do supermercado, filtros/período/ordenação, imagem); armazenamento de imagens (assinatura, vazio, tamanho, fluxo maior que o declarado, caminho fora do diretório); endpoints (fluxo completo com 409 de alertas, erros por item, upload multipart, rejeição de arquivo falso, imagem servida com `nosniff`); datas de auditoria em UTC.
 - Fase 4 (com leitor simulado, isolado no projeto de testes): esquema da saída estruturada (objetos estritos, nomes do contrato), interpretação da resposta (decimais exatos, recusa, `max_tokens`, vazio, JSON inválido), limite de 5 MB e formato antes de chamar a API, escolha do leitor por configuração; rascunho (supermercado por CNPJ, não cadastrado, CNPJ/chave/data inválidos sem preenchimento, valores ausentes, inconsistências, total líquido do item, sugestão única × ambígua, JSON ilegível); importações (upload e fila, leitura bem-sucedida sem registrar compra, cada tipo de falha, erro inesperado sem vazar detalhes, imagem que não é nota, processamento só de pendentes, reprocessamento, confirmação transacional com imagem e vínculo, alertas sem gravação, conclusão manual após falha, estados que impedem confirmar, descarte, status do leitor); ponta a ponta HTTP (enviar → processar em segundo plano → conferir → confirmar → compra com imagem e `processing`; sem leitor configurado; arquivo falso; importação inexistente).
+- Fase 5: normalização (embalado por unidade, granel em KG/G/L/ML e variações, dúzia, pacote com conteúdo; conteúdo desconhecido, CX/PCT, unidades incompatíveis e quantidade inválida sem normalizar), preço efetivo, gravação na confirmação, recálculo restrito ao produto alterado, recálculo idempotente na inicialização, indicadores exatos (média de 3 preços, variação, menor/maior com loja e data, normalizados), filtros de período e loja, produto sem compras, período inválido, comparação por loja com diferença % e produtos comparáveis só da mesma categoria/unidade, agrupamento de itens sem produto (acentos/caixa, rascunhos excluídos, sugestão única), associação posterior com histórico e descrição alternativa; ponta a ponta HTTP (compra → histórico R$/kg → comparação → associação posterior → histórico do novo produto; 404/422/400).
 
 **Frontend — cobertura acumulada**
 - Fase 1: roteamento e títulos, `HealthService`, `toApiError`, indicador da API, layout, página provisória.
 - Fase 2: serviços HTTP (URLs, métodos, corpo e query string), helpers de formulário e utilitários, página de categorias (carregamento, tabela, vazio, erro + nova tentativa, exclusão com confirmação), página de supermercados (parâmetros, formatação de CNPJ/moeda/data, *debounce*, filtro, ordenação, paginação, erro), formulário de supermercado (obrigatórios, formato de CNPJ, nulos, erros do backend nos campos, 409, edição), formulário de produto (padrões, casas decimais, código de barras, payload, 409, erro geral), detalhes do produto (dados, descrições, adicionar, duplicidade, confirmar, 404).
 - Fase 3: arredondamento e total do item, mapeamento de caminhos de erro, formato da chave, adaptador de datas, serviço HTTP de compras (inclusive upload), fluxo de confirmação com alertas (aceitar, recusar, outros erros), `SearchPicker` (busca, seleção, limpeza ao digitar, cadastrar novo, desabilitado), listagem (ordenação padrão, filtro inicial por supermercado, situação, período, vazio, erro, exclusão), formulário (cálculos, divergência, sugestão única e ambígua, validação, data/hora sem fuso, rascunho, confirmação aceita e recusada com atualização na nova tentativa, erros nos itens, chave duplicada, imagem inválida e envio após salvar, edição preservando totais impressos, 404), detalhes (dados, alertas, itens não identificados, confirmação, remoção de imagem, 404).
 - Fase 4: serviço de importações, cartão de envio (upload e navegação, limite de 5 MB, formato, leitor indisponível, leituras em aberto), página de conferência (consulta periódica até concluir e parada, formulário pré-preenchido, falha com nova tentativa/cadastro manual/descarte, compra registrada, 404), formulário em modo conferência (pré-preenchimento com totais impressos e campos vazios, cadastro do supermercado lido, confirmação pela importação, recusa dos alertas, cadastro manual sem leitura, descarte), pré-preenchimento do cadastro de supermercado, `confirmWith`.
+- Fase 5: opções dos gráficos como funções puras (cor por loja em ordem fixa sem ciclar, séries por loja, legenda/rótulos diretos, métrica normalizada, barras ordenadas com rótulo só no menor), períodos, indicadores, página de histórico (vazio, carregamento por `?productId=`, gráfico com descrição acessível, comparação, alternativas, compras, troca de métrica, refetch ao mudar o período, produto sem compras, recarga após associação), diálogo de associação.
 
 **Verificação manual (navegador)**
 - Fase 2: listagem de categorias; cadastro de supermercado com CNPJ inválido (erro do backend exibido no campo) e depois válido; cadastro de produto com redirecionamento aos detalhes; inclusão de descrição alternativa e rejeição de equivalente com acento/caixa diferentes; paginador em português; layout a 375 px.
 - Fase 3: nova compra com seletor de supermercado por busca; descrição "leite int 1l" associada automaticamente ao produto; total do item e totais da nota calculados; total divergente digitado → aviso em tempo real → diálogo com o alerta do backend → confirmação; detalhes com alertas, item não identificado e imagem anexada; listagem filtrada por `?storeId=`; edição carregando a compra confirmada. Corrigido durante a verificação: horários de auditoria exibidos 3 h adiantados (datas UTC sem "Z").
 - Fase 4 (sem chave configurada): Nova compra informa que a leitura está indisponível; imagem enviada → leitura falha com a mensagem de configuração → "Cadastrar manualmente com esta imagem" → compra confirmada com a imagem e vínculo em `processing`. Corrigidos durante a verificação: texto duplicado no aviso, formulário espremido na coluna da conferência (passou a usar *container queries*) e totais automáticos desligados no cadastro manual após falha.
+- Fase 5: compras de teste em duas lojas → histórico com indicadores (médio R$ 5,35; variação +25,05%), gráfico de linhas por loja com legenda e rótulos, barras com o menor preço rotulado, tabela de comparação ("Mais barato", +9,11%), produto da mesma categoria por litro, item sem produto associado pelo diálogo (descrição aprendida aparece no produto), resumo nos detalhes do produto.
 - Os registros e as imagens criados nas verificações foram excluídos do banco e da pasta de uploads locais.
 
 ## 5. Decisões técnicas
@@ -197,10 +225,18 @@
 | D41 | **Limite de 5 MB para a leitura** (limite da API para imagens em base64), validado no frontend e no backend; o armazenamento continua aceitando até 10 MB. | Mensagem clara antes de gastar uma chamada. |
 | D42 | **Chave só no backend**: `ReceiptReader:ApiKey` (user-secrets) ou `ANTHROPIC_API_KEY`; nunca em appsettings versionado nem no Angular. `UserSecretsId` adicionado ao projeto da API. | Especificação 2.4 e seção 10. |
 
+| D43 | **Dois preços no histórico**: "preço pago" (total ÷ quantidade, com descontos) para a evolução do próprio produto; "preço normalizado" (por kg/L/un) para comparar embalagens e produtos. O preço unitário impresso continua guardado na observação. | O consumidor quer saber quanto pagou de fato; a normalização permite comparar tamanhos diferentes (4.5, RN08). |
+| D44 | **Indicadores normalizados só quando todas as compras do período têm a mesma unidade-base**; caso contrário são omitidos. | Evita misturar valores comparáveis com não comparáveis. |
+| D45 | **Produtos da mesma categoria são exibidos apenas como referência** (mesma unidade-base, último preço normalizado); nunca há fusão de históricos. | RN07 e 4.4: marcas/tamanhos diferentes não são equivalentes automaticamente. |
+| D46 | **Recálculo do preço normalizado na inicialização** (idempotente) e ao alterar unidade/conteúdo do produto. | Mantém o histórico coerente com o cadastro e com regras futuras sem migração de dados. |
+| D47 | **Associação posterior em lote por descrição normalizada** (`/api/price-history/assign`), em transação, com aprendizado da descrição. | RN06 com pouco esforço: a mesma descrição costuma se repetir em várias compras. |
+| D48 | **ECharts modular e sob demanda** (`echarts/core` + módulos usados; `provideEchartsCore` com `import()` dinâmico). | Bundle inicial praticamente inalterado. |
+| D49 | **Paleta categórica de referência das diretrizes de visualização** (8 cores em ordem fixa, validada: CVD ΔE ≥ 9,1 entre vizinhas). Três cores têm contraste < 3:1 com a superfície; a compensação é a tabela com os mesmos dados e a legenda. Tema claro apenas (o app ainda não tem modo escuro). | Gráficos legíveis para daltônicos e sem depender só da cor. |
+
 ## 6. Funcionalidades pendentes
 
 - Fase 4: validar a leitura real com uma chave da Anthropic e fotos de notas reais (ajustar prompt/esforço se necessário).
-- Fases 5 a 7: conforme a tabela da seção 1.
+- Fases 6 e 7: conforme a tabela da seção 1.
 
 ## 7. Problemas conhecidos
 
@@ -215,8 +251,11 @@
 - **A leitura real pela API da Anthropic ainda não foi executada**: não há chave neste ambiente. A integração foi escrita com o SDK oficial e compila; o tratamento de respostas, erros e o fluxo completo foram testados com um leitor simulado. Com a chave configurada (README → "Leitura de notas por IA"), validar com fotos reais.
 - Fotos HEIC (padrão do iPhone) não são aceitas; o usuário precisa enviar JPEG/PNG/WebP. Fotos acima de 5 MB precisam ser reduzidas antes do envio.
 - A fila de leitura é em memória e processa uma imagem por vez; adequada ao uso pessoal.
+- O histórico e os indicadores são calculados em memória a partir das observações do produto (sem paginação); adequado ao volume de uso pessoal.
+- O recálculo do preço normalizado percorre todas as observações a cada inicialização; com volumes muito grandes, convém restringi-lo.
+- A cor de cada loja no gráfico segue a ordem dos identificadores das lojas presentes no período exibido; ao mudar o período, uma loja pode trocar de cor se outra deixar de aparecer.
 
-## 8. Próxima etapa — Fase 5 (Histórico de preços)
+## 8. Próxima etapa — Fase 6 (Dashboard e relatórios)
 
-1. Backend: preço normalizado (por kg, litro ou unidade) a partir da unidade e do conteúdo da embalagem do produto (RN08), com conversões G→KG, ML→L, DZ→12 UN e arredondamento explícito; recálculo das observações existentes (D30); `GET /api/products/{id}/prices` (histórico, último, menor, maior e médio preço, variação percentual — médias em `decimal`, D4) e `GET /api/products/{id}/comparison` (por supermercado, somente unidades compatíveis — RN07); testes.
-2. Frontend: instalar Apache ECharts; tela Histórico de preços (busca de produto, gráfico de linhas, indicadores) e comparação entre supermercados; seção de histórico nos detalhes do produto; testes.
+1. Backend: `GET /api/dashboard` (total no mês e no ano, quantidade de compras, ticket médio, maior compra, supermercado com maior gasto), `/api/dashboard/monthly`, `/stores`, `/categories`, com filtros de período, mês/ano, supermercado e categoria — somente compras confirmadas (RN09), somas em SQL sobre inteiros e médias em `decimal`; relatórios `/api/reports/monthly|stores|categories|products` (mais comprados, maior gasto, maior aumento de preço, comparação entre períodos) e `/api/reports/export` em CSV, Excel e PDF refletindo os filtros; testes de consistência entre dashboard, relatórios e compras.
+2. Frontend: Dashboard com indicadores e gráficos (evolução mensal, por supermercado, por categoria, produtos com maior participação, comparativo entre meses) e filtros; tela de Relatórios com filtros e exportações; testes.

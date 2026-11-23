@@ -39,7 +39,7 @@ public class ReceiptExtractionPromptTests
         Assert.Equal("object", schema.GetProperty("type").GetString());
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
         var names = schema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToList();
-        var required = schema.GetProperty("required").EnumerateArray().Select(r => r.GetString()).ToList();
+        var required = schema.GetProperty("required").EnumerateArray().Select(r => r.GetString()!).ToList();
         Assert.Equal(names, required);
     }
 }

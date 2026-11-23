@@ -158,7 +158,8 @@ public class ReceiptServiceTests : IDisposable
         Assert.Equal(new DateTime(2026, 11, 15, 14, 30, 0), milk.ObservedAt);
         Assert.Equal(5.49m, milk.UnitPrice);
         Assert.Equal(4.99m, milk.TotalPrice);
-        Assert.Null(milk.NormalizedPrice);
+        Assert.Equal(4.9900m, milk.NormalizedPrice); // 1 L por R$ 4,99 (Fase 5)
+        Assert.Equal(NormalizedUnit.Liter, milk.NormalizedUnit);
 
         var aliases = await context.ProductAliases.OrderBy(a => a.ProductId).ToListAsync();
         Assert.Equal(2, aliases.Count);

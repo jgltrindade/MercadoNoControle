@@ -4,6 +4,7 @@ using MercadoNoControle.Api.DTOs.Common;
 using MercadoNoControle.Api.DTOs.Products;
 using MercadoNoControle.Api.Models;
 using MercadoNoControle.Api.Services.Exceptions;
+using MercadoNoControle.Api.Services.Receipts;
 using Microsoft.EntityFrameworkCore;
 
 namespace MercadoNoControle.Api.Services;
@@ -103,9 +104,21 @@ public sealed class ProductService(AppDbContext db, TimeProvider timeProvider) :
     public async Task<ProductResponse> UpdateAsync(int id, ProductRequest request, CancellationToken cancellationToken)
     {
         var product = await db.Products.FindAsync([id], cancellationToken) ?? throw NotFound(id);
+        var (previousUnit, previousContent) = (product.Unit, product.PackageContent);
         await ApplyAsync(product, request, cancellationToken);
 
-        await db.SaveChangesAsync(cancellationToken);
+        await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            if (product.Unit != previousUnit || product.PackageContent != previousContent)
+            {
+                // O preço normalizado depende da unidade e do conteúdo da embalagem (RN08).
+                await new PriceObservationRecorder(db).RecalculateAsync(o => o.ProductId == id, cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         return await GetAsync(id, cancellationToken);
     }
 

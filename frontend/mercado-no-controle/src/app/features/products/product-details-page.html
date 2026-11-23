@@ -102,11 +102,28 @@
     </mat-card>
 
     <mat-card appearance="outlined" class="details-grid__full">
-      <app-empty-state
-        icon="monitoring"
-        title="Histórico de preços"
-        message="A evolução de preços e a comparação entre supermercados aparecerão aqui (Fase 5)."
-      />
+      <mat-card-header>
+        <mat-card-title>Histórico de preços</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (prices.isLoading() && !priceSummary()) {
+          <mat-progress-bar mode="indeterminate" />
+        } @else if (priceSummary(); as summary) {
+          @if (summary.count > 0) {
+            <app-price-summary-tiles [summary]="summary" />
+          } @else {
+            <p class="muted">Ainda não há compras confirmadas deste produto.</p>
+          }
+        } @else if (prices.error()) {
+          <p class="muted">Não foi possível carregar o histórico de preços.</p>
+        }
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <a mat-stroked-button routerLink="/price-history" [queryParams]="{ productId: product.id }">
+          <mat-icon>monitoring</mat-icon>
+          Ver evolução e comparação
+        </a>
+      </mat-card-actions>
     </mat-card>
   </div>
 }

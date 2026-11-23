@@ -4,6 +4,7 @@ using MercadoNoControle.Api.Data;
 using MercadoNoControle.Api.Services;
 using MercadoNoControle.Api.Services.Ai;
 using MercadoNoControle.Api.Services.Imports;
+using MercadoNoControle.Api.Services.PriceHistory;
 using MercadoNoControle.Api.Services.Receipts;
 using MercadoNoControle.Api.Services.Storage;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
@@ -33,6 +34,7 @@ builder.Services.AddScoped<IStoreService, StoreService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IReceiptService, ReceiptService>();
 builder.Services.AddScoped<PriceObservationRecorder>();
+builder.Services.AddScoped<IPriceHistoryService, PriceHistoryService>();
 builder.Services.Configure<ImageUploadOptions>(builder.Configuration.GetSection(ImageUploadOptions.SectionName));
 builder.Services.AddSingleton<IReceiptImageStorage, ReceiptImageStorage>();
 

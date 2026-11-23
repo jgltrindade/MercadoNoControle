@@ -18,6 +18,8 @@ import { NotificationService } from '../../core/services/notification.service';
 import { ConfirmService } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { fieldErrorMessage } from '../../shared/forms/form-errors';
+import { PriceHistoryService } from '../price-history/price-history.service';
+import { PriceSummaryTiles } from '../price-history/price-summary-tiles';
 import { ProductFormDialog } from './product-form-dialog';
 import {
   ALIAS_SOURCE_LABELS,
@@ -42,6 +44,7 @@ import {
     MatProgressBarModule,
     MatTooltipModule,
     EmptyState,
+    PriceSummaryTiles,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-details-page.html',
@@ -75,6 +78,13 @@ export class ProductDetailsPage {
     return error ? toApiError(error) : null;
   });
 
+  private readonly priceHistory = inject(PriceHistoryService);
+  protected readonly prices = rxResource({
+    params: () => this.id(),
+    stream: ({ params }) => this.priceHistory.getPrices(params),
+  });
+  protected readonly priceSummary = computed(() => (this.prices.hasValue() ? this.prices.value().summary : null));
+
   protected readonly aliasForm = new FormGroup({
     description: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(250)] }),
   });
@@ -88,7 +98,11 @@ export class ProductDetailsPage {
       .open(ProductFormDialog, { data: product, width: '640px' })
       .afterClosed()
       .pipe(filter(Boolean))
-      .subscribe(() => this.productResource.reload());
+      .subscribe(() => {
+        this.productResource.reload();
+        // Unidade ou conteúdo alterados mudam o preço normalizado do histórico.
+        this.prices.reload();
+      });
   }
 
   delete(): void {

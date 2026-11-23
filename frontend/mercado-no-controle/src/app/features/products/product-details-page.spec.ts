@@ -49,7 +49,11 @@ describe('ProductDetailsPage', () => {
     await settle();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // O resumo do histórico de preços é carregado junto com o produto.
+    http.match((req) => req.url === '/api/products/7/prices');
+    http.verify();
+  });
 
   const element = () => fixture.nativeElement as HTMLElement;
 

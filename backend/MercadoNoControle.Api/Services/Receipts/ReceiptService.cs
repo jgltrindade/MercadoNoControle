@@ -153,7 +153,7 @@ public sealed class ReceiptService(
 
                 // RN04: dados derivados da compra confirmada acompanham a edição.
                 await LearnAliasesAsync(receipt, cancellationToken);
-                priceRecorder.Sync(receipt, Now());
+                await priceRecorder.SyncAsync(receipt, Now(), cancellationToken);
             }
 
             await db.SaveChangesAsync(cancellationToken);
@@ -194,7 +194,7 @@ public sealed class ReceiptService(
             receipt.Status = ReceiptStatus.Confirmed;
             receipt.UpdatedAt = Now();
             await LearnAliasesAsync(receipt, cancellationToken);
-            priceRecorder.Sync(receipt, Now());
+            await priceRecorder.SyncAsync(receipt, Now(), cancellationToken);
 
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -236,7 +236,7 @@ public sealed class ReceiptService(
             import.Receipt = receipt;
             import.Status = ReceiptImportStatus.Confirmed;
             await LearnAliasesAsync(receipt, cancellationToken);
-            priceRecorder.Sync(receipt, Now());
+            await priceRecorder.SyncAsync(receipt, Now(), cancellationToken);
 
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

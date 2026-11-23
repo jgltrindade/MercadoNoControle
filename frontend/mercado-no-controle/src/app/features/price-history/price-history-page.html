@@ -1,0 +1,244 @@
+<app-page-toolbar description="Evolução dos preços pagos por produto e comparação entre supermercados. Considera apenas compras confirmadas." />
+
+<mat-card appearance="outlined" class="filters-card">
+  <div class="filters">
+    <app-search-picker
+      class="filters__product"
+      label="Produto"
+      subscriptSizing="dynamic"
+      placeholder="Busque pelo nome, marca ou descrição da nota"
+      [formControl]="productControl"
+      [search]="pickers.searchProducts"
+      [display]="productName"
+      [describe]="productDescription"
+    />
+    <mat-form-field subscriptSizing="dynamic" class="filters__period">
+      <mat-label>Período</mat-label>
+      <mat-select [value]="period()" (selectionChange)="period.set($event.value)">
+        @for (option of periodOptions; track option.value) {
+          <mat-option [value]="option.value">{{ option.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+</mat-card>
+
+@if (!selectedProduct()) {
+  <mat-card appearance="outlined">
+    <app-empty-state
+      icon="monitoring"
+      title="Escolha um produto"
+      message="Veja como o preço mudou ao longo do tempo e em qual supermercado ele está mais barato."
+    />
+  </mat-card>
+} @else {
+  @if (history.isLoading() && !data()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  @if (loadError(); as error) {
+    <mat-card appearance="outlined">
+      <app-empty-state icon="error" title="Não foi possível carregar o histórico" [message]="error.message">
+        <button mat-stroked-button type="button" (click)="history.reload(); comparison.reload()">Tentar novamente</button>
+      </app-empty-state>
+    </mat-card>
+  } @else if (data(); as data) {
+    <mat-card appearance="outlined" class="section">
+      <mat-card-header>
+        <mat-card-title>
+          <a class="link" [routerLink]="['/products', data.productId]">{{ data.productName }}</a>
+        </mat-card-title>
+        <mat-card-subtitle>{{ data.brand ?? 'Sem marca' }} · {{ packageLabel() }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (data.summary.count === 0) {
+          <app-empty-state
+            icon="query_stats"
+            title="Nenhuma compra no período"
+            message="O histórico é formado pelas compras confirmadas em que o item está associado a este produto."
+          />
+        } @else {
+          <app-price-summary-tiles [summary]="data.summary" />
+        }
+      </mat-card-content>
+    </mat-card>
+
+    @if (data.summary.count > 0) {
+      <mat-card appearance="outlined" class="section">
+        <mat-card-header>
+          <mat-card-title>Evolução do preço</mat-card-title>
+          @if (canNormalize() && data.normalizedUnit) {
+            <mat-button-toggle-group
+              class="metric-toggle"
+              hideSingleSelectionIndicator
+              [value]="effectiveMetric()"
+              (change)="metric.set($event.value)"
+              aria-label="Valor exibido no gráfico"
+            >
+              <mat-button-toggle value="paid">Preço pago</mat-button-toggle>
+              <mat-button-toggle value="normalized">Por {{ unitLabels[data.normalizedUnit] }}</mat-button-toggle>
+            </mat-button-toggle-group>
+          }
+        </mat-card-header>
+        <mat-card-content>
+          <app-chart [options]="trendOption()" [label]="trendLabel()" [height]="320" />
+        </mat-card-content>
+      </mat-card>
+
+      @if (comparisonData(); as comparison) {
+        <mat-card appearance="outlined" class="section">
+          <mat-card-header>
+            <mat-card-title>Comparação entre supermercados</mat-card-title>
+            <mat-card-subtitle>Último preço pago em cada supermercado no período</mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            @if (comparison.stores.length > 1) {
+              <app-chart
+                [options]="comparisonOption()"
+                label="Último preço pago por supermercado, do menor para o maior. Os valores estão na tabela abaixo."
+                [height]="56 + comparison.stores.length * 40"
+              />
+            }
+            <div class="table-container">
+              <table mat-table [dataSource]="comparison.stores" aria-label="Preços por supermercado">
+                <ng-container matColumnDef="store">
+                  <th mat-header-cell *matHeaderCellDef>Supermercado</th>
+                  <td mat-cell *matCellDef="let store">
+                    <div class="cell-title">{{ store.storeName }}</div>
+                    <div class="cell-subtitle">{{ store.count }} compra(s)</div>
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="last">
+                  <th mat-header-cell *matHeaderCellDef class="cell-number">Último preço</th>
+                  <td mat-cell *matCellDef="let store" class="cell-number nowrap">
+                    <div class="cell-title">{{ store.last.price | currency: 'BRL' : 'symbol' : '1.2-4' }}</div>
+                    <div class="cell-subtitle">{{ store.last.date | date: 'dd/MM/yyyy' }}</div>
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="lowest">
+                  <th mat-header-cell *matHeaderCellDef class="cell-number">Menor</th>
+                  <td mat-cell *matCellDef="let store" class="cell-number nowrap">{{ store.lowest | currency: 'BRL' : 'symbol' : '1.2-4' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="average">
+                  <th mat-header-cell *matHeaderCellDef class="cell-number">Médio</th>
+                  <td mat-cell *matCellDef="let store" class="cell-number nowrap">{{ store.average | currency: 'BRL' : 'symbol' : '1.2-2' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="difference">
+                  <th mat-header-cell *matHeaderCellDef class="cell-number">Diferença</th>
+                  <td mat-cell *matCellDef="let store" class="cell-number nowrap">
+                    @if (store.differenceToCheapestPercent === 0) {
+                      <span class="cheapest"><mat-icon class="inline-icon" aria-hidden="true">sell</mat-icon> Mais barato</span>
+                    } @else {
+                      +{{ store.differenceToCheapestPercent | number: '1.0-2' }}%
+                    }
+                  </td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="storeColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: storeColumns"></tr>
+              </table>
+            </div>
+
+            @if (comparison.alternatives.length && comparison.normalizedUnit) {
+              <h3 class="subsection">Produtos da mesma categoria (preço por {{ unitLabels[comparison.normalizedUnit] }})</h3>
+              <p class="muted note">Para referência: são produtos diferentes e não entram no histórico deste produto.</p>
+              <ul class="alternatives">
+                @for (alternative of comparison.alternatives; track alternative.productId) {
+                  <li>
+                    <button
+                      type="button"
+                      class="link link-button"
+                      (click)="productControl.setValue({ id: alternative.productId, name: alternative.name, brand: alternative.brand })"
+                    >
+                      {{ alternative.name }}
+                    </button>
+                    <span class="muted">{{ alternative.brand ?? '' }}</span>
+                    <span class="alternatives__price">
+                      {{ alternative.lastNormalized | currency: 'BRL' : 'symbol' : '1.2-4' }}/{{ unitLabel(alternative.normalizedUnit) }}
+                    </span>
+                    <span class="muted">{{ alternative.storeName }} · {{ alternative.date | date: 'dd/MM/yyyy' }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <mat-card appearance="outlined" class="section">
+        <mat-card-header>
+          <mat-card-title>Compras</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="table-container">
+          <table mat-table [dataSource]="data.points" aria-label="Compras do produto">
+            <ng-container matColumnDef="date">
+              <th mat-header-cell *matHeaderCellDef>Data</th>
+              <td mat-cell *matCellDef="let point" class="nowrap">
+                <a class="link" [routerLink]="['/receipts', point.receiptId]">{{ point.date | date: 'dd/MM/yyyy' }}</a>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="store">
+              <th mat-header-cell *matHeaderCellDef>Supermercado</th>
+              <td mat-cell *matCellDef="let point">{{ point.storeName }}</td>
+            </ng-container>
+            <ng-container matColumnDef="quantity">
+              <th mat-header-cell *matHeaderCellDef class="cell-number">Qtd.</th>
+              <td mat-cell *matCellDef="let point" class="cell-number nowrap">{{ point.quantity | number: '1.0-4' }} {{ point.unit ?? '' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="paid">
+              <th mat-header-cell *matHeaderCellDef class="cell-number">Preço pago</th>
+              <td mat-cell *matCellDef="let point" class="cell-number nowrap">
+                <div class="cell-title">{{ point.effectiveUnitPrice | currency: 'BRL' : 'symbol' : '1.2-4' }}</div>
+                <div class="cell-subtitle">total {{ point.totalPrice | currency }}</div>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="normalized">
+              <th mat-header-cell *matHeaderCellDef class="cell-number">Preço normalizado</th>
+              <td mat-cell *matCellDef="let point" class="cell-number nowrap">
+                @if (point.normalizedPrice !== null) {
+                  {{ point.normalizedPrice | currency: 'BRL' : 'symbol' : '1.2-4' }}/{{ unitLabel(point.normalizedUnit) }}
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="pointColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: pointColumns"></tr>
+          </table>
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+}
+
+<mat-card appearance="outlined" class="section">
+  <mat-card-header>
+    <mat-card-title>Itens sem produto</mat-card-title>
+    <mat-card-subtitle>Itens de compras confirmadas que ainda não fazem parte de nenhum histórico</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    @if (unassigned.isLoading() && !unassignedGroups().length) {
+      <mat-progress-bar mode="indeterminate" />
+    } @else if (unassignedGroups().length === 0) {
+      <p class="muted">Todos os itens das compras confirmadas estão associados a produtos.</p>
+    } @else {
+      <ul class="unassigned">
+        @for (group of unassignedGroups(); track group.normalizedDescription) {
+          <li>
+            <div>
+              <div class="cell-title">{{ group.description }}</div>
+              <div class="cell-subtitle">
+                {{ group.occurrences }} compra(s) · {{ group.totalSpent | currency }} · última em {{ group.lastSeenAt | date: 'dd/MM/yyyy' }}
+                @if (group.suggestedProductName) {
+                  · sugestão: {{ group.suggestedProductName }}
+                }
+              </div>
+            </div>
+            <button mat-stroked-button type="button" (click)="openAssign(group)" [attr.aria-label]="'Associar ' + group.description">
+              Associar
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </mat-card-content>
+</mat-card>

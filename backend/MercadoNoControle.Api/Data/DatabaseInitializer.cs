@@ -1,8 +1,12 @@
+using MercadoNoControle.Api.Services.Receipts;
 using Microsoft.EntityFrameworkCore;
 
 namespace MercadoNoControle.Api.Data;
 
-/// <summary>Cria/atualiza o banco SQLite aplicando as migrations pendentes na inicialização.</summary>
+/// <summary>
+/// Cria/atualiza o banco SQLite aplicando as migrations pendentes na inicialização e mantém os
+/// dados derivados coerentes com as regras atuais (preço normalizado do histórico).
+/// </summary>
 public static class DatabaseInitializer
 {
     public static async Task MigrateDatabaseAsync(this WebApplication app, CancellationToken cancellationToken = default)
@@ -18,5 +22,14 @@ public static class DatabaseInitializer
         }
 
         await db.Database.MigrateAsync(cancellationToken);
+
+        // Observações registradas antes do cálculo de preço normalizado (ou com regra anterior)
+        // são atualizadas. A operação é idempotente.
+        var recalculated = await scope.ServiceProvider.GetRequiredService<PriceObservationRecorder>()
+            .RecalculateAsync(null, cancellationToken);
+        if (recalculated > 0)
+        {
+            logger.LogInformation("Preço normalizado recalculado em {Count} observação(ões) de preço.", recalculated);
+        }
     }
 }
