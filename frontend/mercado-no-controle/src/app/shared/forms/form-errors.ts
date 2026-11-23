@@ -10,6 +10,9 @@ export function fieldErrorMessage(control: AbstractControl | null): string | nul
   if (errors['server']) return String(errors['server']);
   if (errors['required']) return 'Campo obrigatório.';
   if (errors['maxlength']) return `Máximo de ${errors['maxlength'].requiredLength} caracteres.`;
+  if (errors['minlength']) return `Mínimo de ${errors['minlength'].requiredLength} caracteres.`;
+  if (errors['email']) return 'E-mail inválido.';
+  if (errors['mismatch']) return 'As senhas não conferem.';
   if (errors['min']) return `O valor mínimo é ${errors['min'].min}.`;
   if (errors['max']) return `O valor máximo é ${errors['max'].max}.`;
   if (errors['decimalPlaces']) return `Use no máximo ${errors['decimalPlaces'].max} casas decimais.`;

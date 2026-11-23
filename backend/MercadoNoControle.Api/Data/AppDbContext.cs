@@ -11,7 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     /// na leitura ele é restaurado como UTC para a API serializar com o sufixo "Z".
     /// Datas da compra (IssuedAt, ObservedAt) são horário local da nota e não entram aqui.
     /// </summary>
-    private static readonly HashSet<string> UtcAuditProperties = ["CreatedAt", "UpdatedAt", "ProcessedAt"];
+    private static readonly HashSet<string> UtcAuditProperties = ["CreatedAt", "UpdatedAt", "ProcessedAt", "PasswordChangedAt", "LastLoginAt"];
 
     private static readonly ValueConverter<DateTime, DateTime> UtcConverter =
         new(value => value, value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
@@ -31,6 +31,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PriceObservation> PriceObservations => Set<PriceObservation>();
 
     public DbSet<ReceiptImport> ReceiptImports => Set<ReceiptImport>();
+
+    public DbSet<AppUser> Users => Set<AppUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

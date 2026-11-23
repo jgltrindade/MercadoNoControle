@@ -20,7 +20,8 @@ import { NotificationService } from '../../core/services/notification.service';
 import { ConfirmService } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { PageToolbar } from '../../shared/components/page-toolbar/page-toolbar';
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, SortDirection } from '../../shared/models/paging';
+import { PreferencesService } from '../../core/services/preferences.service';
+import { PAGE_SIZE_OPTIONS, SortDirection } from '../../shared/models/paging';
 import { latestValue } from '../../shared/utils/resource';
 import { CategoriesService } from '../categories/categories.service';
 import { ProductFormDialog } from './product-form-dialog';
@@ -76,7 +77,7 @@ export class ProductsPage {
   protected readonly categoryFilter = signal<number | null>(null);
   protected readonly statusFilter = signal<ProductStatus | null>(null);
   protected readonly pageIndex = signal(0);
-  protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
+  protected readonly pageSize = signal(inject(PreferencesService).preferences().pageSize);
   protected readonly sort = signal<{ active: string; direction: SortDirection }>({ active: 'name', direction: 'asc' });
 
   protected readonly query = computed<ProductQuery>(() => ({

@@ -7,9 +7,11 @@ using MercadoNoControle.Api.Services.Analytics;
 using MercadoNoControle.Api.Services.Imports;
 using MercadoNoControle.Api.Services.PriceHistory;
 using MercadoNoControle.Api.Services.Receipts;
+using MercadoNoControle.Api.Services.Settings;
 using MercadoNoControle.Api.Services.Storage;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +28,9 @@ var storagePaths = StoragePaths.Resolve(storageOptions, builder.Environment.Cont
 storagePaths.EnsureDirectories();
 builder.Services.AddSingleton(storagePaths);
 
+// Autenticação de usuário único, limites de requisição e proteção das chaves de sessão.
+builder.AddAppSecurity(storagePaths);
+
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(storagePaths.ConnectionString));
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -39,6 +44,8 @@ builder.Services.AddScoped<IPriceHistoryService, PriceHistoryService>();
 builder.Services.AddScoped<AnalyticsData>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<IBackupService, BackupService>();
 
 // QuestPDF: licença Community (uso pessoal / receita anual inferior a US$ 1 milhão).
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
@@ -77,12 +84,18 @@ var app = builder.Build();
 
 await app.MigrateDatabaseAsync();
 
+if (app.Configuration.GetValue<bool>("ReverseProxy:Enabled"))
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseSecurityHeaders();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "Mercado no Controle API v1");
@@ -95,8 +108,42 @@ else
     app.UseHttpsRedirection();
 }
 
+// Publicação: a interface Angular compilada (Spa:RootPath, padrão wwwroot) é servida pela própria
+// API, na mesma origem. Sem a pasta (desenvolvimento), o Angular roda separado com proxy.
+var spaRoot = Path.GetFullPath(app.Configuration["Spa:RootPath"] ?? "wwwroot", app.Environment.ContentRootPath);
+var serveSpa = File.Exists(Path.Combine(spaRoot, "index.html"));
+var spaFiles = serveSpa ? new PhysicalFileProvider(spaRoot) : null;
+var spaFileOptions = new StaticFileOptions
+{
+    FileProvider = spaFiles,
+    OnPrepareResponse = context =>
+    {
+        // index.html sempre revalidado; demais arquivos têm hash no nome e podem ficar em cache.
+        context.Context.Response.Headers.CacheControl = context.File.Name == "index.html"
+            ? "no-cache"
+            : "public, max-age=31536000, immutable";
+    }
+};
+if (serveSpa)
+{
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = spaFiles });
+    app.UseStaticFiles(spaFileOptions);
+}
+
+// Roteamento depois dos arquivos estáticos: do contrário a rota de fallback da interface seria
+// escolhida antes e os arquivos (JS/CSS) seriam respondidos com o index.html.
+app.UseRouting();
 app.UseCors(FrontendCorsPolicy);
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
+
+if (serveSpa)
+{
+    // Rotas do Angular (ex.: /receipts/10) devolvem index.html; rotas /api desconhecidas continuam 404.
+    app.MapFallbackToFile("{*path:regex(^(?!api/).*$)}", "index.html", spaFileOptions).AllowAnonymous();
+}
 
 app.Logger.LogInformation("Banco de dados: {DatabaseFile}", storagePaths.DatabaseFile);
 app.Logger.LogInformation("Diretório de imagens: {UploadsDirectory}", storagePaths.UploadsDirectory);

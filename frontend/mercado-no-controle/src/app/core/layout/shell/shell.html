@@ -39,6 +39,31 @@
       <h1 class="shell__title">{{ pageTitle() }}</h1>
       <span class="shell__spacer"></span>
       <app-api-status />
+      @if (user(); as user) {
+        <button
+          mat-icon-button
+          type="button"
+          class="shell__user"
+          [matMenuTriggerFor]="userMenu"
+          [attr.aria-label]="'Conta de ' + user.name"
+        >
+          <mat-icon>account_circle</mat-icon>
+        </button>
+        <mat-menu #userMenu="matMenu" xPosition="before">
+          <div class="shell__user-info" role="presentation">
+            <strong>{{ user.name }}</strong>
+            <span>{{ user.email }}</span>
+          </div>
+          <a mat-menu-item routerLink="/settings">
+            <mat-icon>settings</mat-icon>
+            <span>Configurações</span>
+          </a>
+          <button mat-menu-item type="button" (click)="logout()">
+            <mat-icon>logout</mat-icon>
+            <span>Sair</span>
+          </button>
+        </mat-menu>
+      }
     </mat-toolbar>
 
     <main class="shell__content">

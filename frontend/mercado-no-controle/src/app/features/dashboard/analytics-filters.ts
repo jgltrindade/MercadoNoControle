@@ -9,6 +9,7 @@ import { fromIsoDate, toIsoDate } from '../../core/i18n/date-adapter';
 import { SearchPicker } from '../../shared/components/search-picker/search-picker';
 import { CategoriesService } from '../categories/categories.service';
 import { ReceiptPickers, StoreRef, storeDescription, storeName } from '../receipts/pickers';
+import { PreferencesService } from '../../core/services/preferences.service';
 import { AnalyticsQuery } from './analytics.service';
 
 export type PeriodPreset = 'month' | 'last3' | 'last6' | 'last12' | 'year' | 'lastYear' | 'custom';
@@ -55,20 +56,29 @@ export interface AnalyticsFilterState {
 
 export const DEFAULT_FILTERS: AnalyticsFilterState = { preset: 'last12', from: null, to: null, storeId: null, categoryId: null };
 
+/** Períodos que podem ser escolhidos como padrão nas preferências (todos exceto o personalizado). */
+export const DEFAULT_PERIOD_OPTIONS = PERIOD_PRESETS.filter((p) => p.value !== 'custom');
+
+/** Filtros iniciais com o período padrão escolhido nas preferências (valor inválido → 12 meses). */
+export function defaultFilters(preferredPeriod?: string | null): AnalyticsFilterState {
+  const preset = DEFAULT_PERIOD_OPTIONS.find((p) => p.value === preferredPeriod)?.value ?? DEFAULT_FILTERS.preset;
+  return { ...DEFAULT_FILTERS, preset };
+}
+
 export function toAnalyticsQuery(state: AnalyticsFilterState, today = new Date()): AnalyticsQuery {
   const range = state.preset === 'custom' ? { from: state.from, to: state.to } : presetRange(state.preset, today);
   return { ...range, storeId: state.storeId, categoryId: state.categoryId };
 }
 
 /** Lê o estado dos filtros a partir de parâmetros de URL (valores inválidos voltam ao padrão). */
-export function filtersFromParams(params: Record<string, string | undefined>): AnalyticsFilterState {
-  const preset = PERIOD_PRESETS.some((p) => p.value === params['period']) ? (params['period'] as PeriodPreset) : DEFAULT_FILTERS.preset;
+export function filtersFromParams(params: Record<string, string | undefined>, defaults = DEFAULT_FILTERS): AnalyticsFilterState {
+  const preset = PERIOD_PRESETS.some((p) => p.value === params['period']) ? (params['period'] as PeriodPreset) : defaults.preset;
   const id = (value: string | undefined) => (value && Number(value) > 0 ? Number(value) : null);
   const date = (value: string | undefined) => (value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
   const from = date(params['from']);
   const to = date(params['to']);
   return {
-    preset: preset === 'custom' && (!from || !to) ? DEFAULT_FILTERS.preset : preset,
+    preset: preset === 'custom' && (!from || !to) ? defaults.preset : preset,
     from,
     to,
     storeId: id(params['storeId']),
@@ -147,6 +157,8 @@ export function filtersToParams(state: AnalyticsFilterState): Record<string, str
 export class AnalyticsFilters implements OnInit {
   protected readonly pickers = inject(ReceiptPickers);
   private readonly categoriesService = inject(CategoriesService);
+  /** Filtros "limpos": período padrão das preferências, sem supermercado nem categoria. */
+  private readonly defaults = defaultFilters(inject(PreferencesService).preferences().analyticsPeriod);
 
   /** Estado inicial (ex.: da URL). */
   readonly initial = input<AnalyticsFilterState>(DEFAULT_FILTERS);
@@ -168,7 +180,7 @@ export class AnalyticsFilters implements OnInit {
   protected readonly categories = computed(() => (this.categoriesResource.hasValue() ? this.categoriesResource.value() : []));
   protected readonly hasFilters = computed(() => {
     const state = this.state();
-    return state.preset !== DEFAULT_FILTERS.preset || state.storeId !== null || state.categoryId !== null;
+    return state.preset !== this.defaults.preset || state.storeId !== null || state.categoryId !== null;
   });
 
   constructor() {
@@ -212,7 +224,7 @@ export class AnalyticsFilters implements OnInit {
 
   reset(): void {
     this.storeControl.setValue(null, { emitEvent: false });
-    this.state.set(DEFAULT_FILTERS);
-    this.changed.emit(DEFAULT_FILTERS);
+    this.state.set(this.defaults);
+    this.changed.emit(this.defaults);
   }
 }

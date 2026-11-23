@@ -1,0 +1,260 @@
+<div class="settings">
+  @if (user(); as account) {
+    <mat-card appearance="outlined" class="settings__card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar>account_circle</mat-icon>
+        <mat-card-title>Conta</mat-card-title>
+        <mat-card-subtitle>Usuário único da aplicação</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="settings__form" novalidate>
+          <mat-form-field>
+            <mat-label>Nome</mat-label>
+            <input matInput formControlName="name" autocomplete="name" />
+            <mat-error>{{ errorMessage(profileForm.controls.name) }}</mat-error>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>E-mail (login)</mat-label>
+            <input matInput type="email" formControlName="email" autocomplete="username" />
+            <mat-error>{{ errorMessage(profileForm.controls.email) }}</mat-error>
+          </mat-form-field>
+          <div class="settings__actions">
+            @if (account.lastLoginAt) {
+              <span class="muted">Último acesso: {{ account.lastLoginAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+            }
+            <button mat-stroked-button type="submit" [disabled]="savingProfile() || profileForm.pristine">
+              {{ savingProfile() ? 'Salvando…' : 'Salvar dados' }}
+            </button>
+          </div>
+        </form>
+
+        <h3 class="settings__subtitle">Alterar senha</h3>
+        <form [formGroup]="passwordForm" (ngSubmit)="changePassword()" class="settings__form" novalidate>
+          <mat-form-field>
+            <mat-label>Senha atual</mat-label>
+            <input matInput type="password" formControlName="currentPassword" autocomplete="current-password" />
+            <mat-error>{{ errorMessage(passwordForm.controls.currentPassword) }}</mat-error>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Nova senha</mat-label>
+            <input matInput type="password" formControlName="password" autocomplete="new-password" />
+            <mat-hint>Mínimo de {{ minLength }} caracteres.</mat-hint>
+            <mat-error>{{ errorMessage(passwordForm.controls.password) }}</mat-error>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Confirmar nova senha</mat-label>
+            <input matInput type="password" formControlName="confirmPassword" autocomplete="new-password" />
+            <mat-error>{{ errorMessage(passwordForm.controls.confirmPassword) }}</mat-error>
+          </mat-form-field>
+          <div class="settings__actions">
+            <button mat-stroked-button type="submit" [disabled]="savingPassword()">
+              {{ savingPassword() ? 'Alterando…' : 'Alterar senha' }}
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <mat-card appearance="outlined" class="settings__card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>tune</mat-icon>
+      <mat-card-title>Preferências de exibição</mat-card-title>
+      <mat-card-subtitle>Valem para este navegador</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content class="settings__form">
+      <mat-form-field>
+        <mat-label>Período padrão do dashboard e dos relatórios</mat-label>
+        <mat-select [value]="preferences().analyticsPeriod" (selectionChange)="setPeriod($event.value)">
+          @for (option of periodOptions; track option.value) {
+            <mat-option [value]="option.value">{{ option.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Itens por página nas listagens</mat-label>
+        <mat-select [value]="preferences().pageSize" (selectionChange)="setPageSize($event.value)">
+          @for (size of pageSizeOptions; track size) {
+            <mat-option [value]="size">{{ size }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <p class="muted settings__note">
+        Categorias são gerenciadas na tela <a routerLink="/categories">Categorias</a>.
+      </p>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card appearance="outlined" class="settings__card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>document_scanner</mat-icon>
+      <mat-card-title>Leitura de notas por IA</mat-card-title>
+      <mat-card-subtitle>Provedor configurado no servidor</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (info(); as info) {
+        <p class="status" [class.status--ok]="info.reader.available" [class.status--off]="!info.reader.available">
+          <mat-icon>{{ info.reader.available ? 'check_circle' : 'info' }}</mat-icon>
+          {{ info.reader.available ? 'Leitura automática disponível' : 'Leitura automática indisponível' }}
+        </p>
+        <dl class="details">
+          <dt>Provedor</dt>
+          <dd>{{ info.reader.provider }}</dd>
+          @if (info.reader.model) {
+            <dt>Modelo</dt>
+            <dd>{{ info.reader.model }}</dd>
+          }
+          @if (info.reader.effort) {
+            <dt>Esforço</dt>
+            <dd>{{ info.reader.effort }}</dd>
+          }
+          <dt>Tempo máximo</dt>
+          <dd>{{ info.reader.timeoutSeconds }} s</dd>
+        </dl>
+        @if (info.reader.message) {
+          <p class="muted">{{ info.reader.message }}</p>
+        }
+        <p class="muted settings__note">
+          Por segurança, a chave da API fica somente no servidor e não pode ser vista nem alterada por aqui.
+          Para configurar, defina <code>ReceiptReader:ApiKey</code> (user-secrets) ou a variável <code>ANTHROPIC_API_KEY</code>
+          e reinicie a API (README → "Leitura de notas por IA"). Sem chave, o cadastro manual continua disponível.
+        </p>
+      } @else if (systemError(); as message) {
+        <p class="error-text">{{ message }}</p>
+      } @else {
+        <mat-progress-bar mode="indeterminate" />
+      }
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card appearance="outlined" class="settings__card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>backup</mat-icon>
+      <mat-card-title>Backup e exportação</mat-card-title>
+      <mat-card-subtitle>Banco de dados, imagens e planilhas</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="download">
+        <div>
+          <strong>Backup completo</strong>
+          <p class="muted">Cópia do banco e de todas as imagens das notas em um arquivo .zip, para restaurar a aplicação.</p>
+        </div>
+        <button mat-flat-button type="button" [disabled]="!!downloading()" (click)="downloadBackup()">
+          <mat-icon>download</mat-icon>
+          {{ downloading() === 'backup' ? 'Gerando…' : 'Baixar backup' }}
+        </button>
+      </div>
+      <div class="download">
+        <div>
+          <strong>Exportar dados (CSV)</strong>
+          <p class="muted">Supermercados, categorias, produtos, compras, itens e histórico de preços para abrir em planilhas.</p>
+        </div>
+        <button mat-stroked-button type="button" [disabled]="!!downloading()" (click)="exportData()">
+          <mat-icon>table_view</mat-icon>
+          {{ downloading() === 'export' ? 'Gerando…' : 'Exportar CSV' }}
+        </button>
+      </div>
+      <p class="muted settings__note">
+        Para restaurar: pare a aplicação, substitua o arquivo do banco e a pasta de imagens pelos do backup e inicie
+        novamente (README → "Backup e restauração"). Guarde os backups fora deste computador.
+      </p>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card appearance="outlined" class="settings__card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>photo_library</mat-icon>
+      <mat-card-title>Imagens das notas</mat-card-title>
+      <mat-card-subtitle>Arquivos armazenados no servidor</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (imageSummary(); as images) {
+        <div class="figures">
+          <div class="figure">
+            <span class="figure__value">{{ images.totalFiles }}</span>
+            <span class="figure__label">imagens · {{ formatBytes(images.totalBytes) }}</span>
+          </div>
+          <div class="figure">
+            <span class="figure__value">{{ images.referencedFiles }}</span>
+            <span class="figure__label">em uso</span>
+          </div>
+          <div class="figure">
+            <span class="figure__value">{{ images.orphans.length }}</span>
+            <span class="figure__label">órfãs · {{ formatBytes(images.orphanBytes) }}</span>
+          </div>
+        </div>
+        @if (images.missingFiles > 0) {
+          <p class="error-text">
+            <mat-icon inline>warning</mat-icon>
+            {{ images.missingFiles }} nota(s) ou leitura(s) apontam para imagens que não estão mais no armazenamento.
+          </p>
+        }
+        @if (images.orphans.length) {
+          <p class="muted">
+            Imagens órfãs não pertencem a nenhuma nota nem a leitura em andamento (por exemplo, imagens removidas
+            ou de notas excluídas).
+          </p>
+          <ul class="orphans">
+            @for (orphan of images.orphans.slice(0, orphanPreviewLimit); track orphan.path) {
+              <li>
+                <span class="orphans__path">{{ orphan.path }}</span>
+                <span class="muted nowrap">{{ formatBytes(orphan.sizeBytes) }} · {{ orphan.modifiedAt | date: 'dd/MM/yyyy' }}</span>
+              </li>
+            }
+          </ul>
+          @if (images.orphans.length > orphanPreviewLimit) {
+            <p class="muted">e mais {{ images.orphans.length - orphanPreviewLimit }}.</p>
+          }
+          <div class="settings__actions">
+            <button mat-stroked-button type="button" class="destructive" [disabled]="deleting()" (click)="deleteOrphans()">
+              <mat-icon>delete_sweep</mat-icon>
+              {{ deleting() ? 'Excluindo…' : 'Excluir imagens órfãs' }}
+            </button>
+          </div>
+        } @else {
+          <p class="muted">Nenhuma imagem órfã.</p>
+        }
+      } @else if (imagesError(); as message) {
+        <app-empty-state icon="error" title="Não foi possível listar as imagens" [message]="message">
+          <button mat-stroked-button type="button" (click)="images.reload()">Tentar novamente</button>
+        </app-empty-state>
+      } @else {
+        <mat-progress-bar mode="indeterminate" />
+      }
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card appearance="outlined" class="settings__card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>info</mat-icon>
+      <mat-card-title>Sobre esta instalação</mat-card-title>
+      <mat-card-subtitle>Configurações gerais</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (info(); as info) {
+        <dl class="details">
+          <dt>Versão</dt>
+          <dd>{{ info.version }} ({{ info.environment }})</dd>
+          <dt>Acesso</dt>
+          <dd>{{ info.authenticationEnabled ? 'Protegido por login' : 'Sem login (uso local)' }}</dd>
+          <dt>Banco de dados</dt>
+          <dd><code>{{ info.databaseFile }}</code> · {{ formatBytes(info.databaseSizeBytes) }}</dd>
+          <dt>Imagens</dt>
+          <dd><code>{{ info.uploadsDirectory }}</code></dd>
+          <dt>Registros</dt>
+          <dd>
+            {{ info.counts.confirmedReceipts }} compra(s) confirmada(s), {{ info.counts.draftReceipts }} rascunho(s),
+            {{ info.counts.products }} produto(s), {{ info.counts.stores }} supermercado(s),
+            {{ info.counts.categories }} categoria(s), {{ info.counts.priceObservations }} preço(s) registrado(s)
+          </dd>
+        </dl>
+      } @else if (systemError(); as message) {
+        <app-empty-state icon="error" title="Não foi possível carregar as informações" [message]="message">
+          <button mat-stroked-button type="button" (click)="system.reload()">Tentar novamente</button>
+        </app-empty-state>
+      } @else {
+        <mat-progress-bar mode="indeterminate" />
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

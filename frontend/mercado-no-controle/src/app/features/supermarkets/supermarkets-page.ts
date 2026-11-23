@@ -21,7 +21,8 @@ import { NotificationService } from '../../core/services/notification.service';
 import { ConfirmService } from '../../shared/components/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { PageToolbar } from '../../shared/components/page-toolbar/page-toolbar';
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, SortDirection } from '../../shared/models/paging';
+import { PreferencesService } from '../../core/services/preferences.service';
+import { PAGE_SIZE_OPTIONS, SortDirection } from '../../shared/models/paging';
 import { CnpjPipe } from '../../shared/pipes/cnpj.pipe';
 import { latestValue } from '../../shared/utils/resource';
 import { StoreFormDialog } from './store-form-dialog';
@@ -66,7 +67,7 @@ export class SupermarketsPage {
   protected readonly stateFilter = signal('');
   private readonly search = signal('');
   protected readonly pageIndex = signal(0);
-  protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
+  protected readonly pageSize = signal(inject(PreferencesService).preferences().pageSize);
   protected readonly sort = signal<{ active: string; direction: SortDirection }>({ active: 'tradeName', direction: 'asc' });
 
   protected readonly query = computed<StoreQuery>(() => ({

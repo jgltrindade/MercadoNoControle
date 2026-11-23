@@ -1,9 +1,9 @@
 # Status de Desenvolvimento — Mercado no Controle
 
 **Última atualização:** 2026-11-23
-**Fase atual:** Fase 6 — Dashboard e relatórios ✅ concluída
-**Próxima etapa:** Fase 7 — Qualidade e entrega
-**Pendência registrada:** validar a leitura real por IA com uma chave configurada (seção 7).
+**Fase atual:** Fase 7 — Qualidade e entrega ✅ concluída (todas as fases do planejamento concluídas)
+**Próxima etapa:** uso real e validações pendentes (seção 8)
+**Pendências registradas:** validar a leitura real por IA com uma chave configurada; construir a imagem Docker em um ambiente com o Docker em execução (seção 7).
 
 ---
 
@@ -17,7 +17,7 @@
 | 4 | Inteligência artificial (`IReceiptReader`, conferência, confirmação) | ✅ Concluída |
 | 5 | Histórico de preços (registro, normalização, comparação, gráficos) | ✅ Concluída |
 | 6 | Dashboard e relatórios (indicadores, filtros, exportações) | ✅ Concluída |
-| 7 | Qualidade e entrega (autenticação, backup, segurança, publicação) | ⏳ Próxima |
+| 7 | Qualidade e entrega (autenticação, backup, segurança, publicação) | ✅ Concluída |
 
 ## 2. Ambiente verificado
 
@@ -177,13 +177,76 @@
 - **Relatórios** (`/reports`): seletor de relatório e de ranking, mesmos filtros, tabela formatada por tipo de coluna (moeda, %, datas pt-BR, linhas de total em negrito) e botões CSV, Excel e PDF.
 - Paleta, eixo único e rótulos seletivos seguem as mesmas regras da Fase 5. Rótulos dos eixos sem ",00" nas marcas inteiras, e marcas sobrepostas são ocultadas.
 
+### Fase 7 — Qualidade e entrega
+
+**Segurança e acesso (backend)**
+- **Usuário único** (`AppUser`, tabela `Users`, migration `AddUsers`): nome, e-mail (único, sem diferenciar maiúsculas), hash da senha (PBKDF2 com salt do `PasswordHasher` do ASP.NET Core), datas de criação, troca de senha e último acesso.
+- **`/api/auth`**:
+  - `status` e `login` (com "manter conectado").
+  - `setup`: cadastro inicial, que inicia a sessão; aceito só a partir do próprio computador, salvo `AllowRemoteSetup`.
+  - `logout`, `password` (exige a senha atual e encerra as outras sessões) e `profile`.
+- **Sessão por cookie** `HttpOnly` + `SameSite=Strict`, 30 dias com renovação. A sessão é validada a cada requisição contra a data da última troca de senha. As chaves de proteção ficam em `data/keys`, protegidas por DPAPI no Windows.
+- **Toda a API exige sessão** (política padrão), exceto `health` e `auth`. Respostas 401/403 em ProblemDetails (sem redirecionamento).
+- **Limite de tentativas:** 10 por 5 minutos por IP em login e cadastro (429).
+- **Cabeçalhos de segurança:**
+  - `Content-Security-Policy`: `default-src 'none'` na API; política própria para a interface publicada.
+  - `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` e `Cross-Origin-Opener-Policy`.
+- **Limite de 2 MB por requisição** (envios de imagem mantêm 10 MB).
+- **Suporte a proxy reverso** (`ReverseProxy:Enabled`, cabeçalhos `X-Forwarded-*`).
+- **Recuperação de acesso** (`Authentication:ResetUser`): remove apenas o usuário, para refazer o cadastro inicial.
+
+**Configurações, backup e imagens (backend)**
+- `GET /api/settings/system`: versão, ambiente, autenticação, caminho e tamanho do banco, diretório de imagens, contagem de registros e leitor de IA (provedor, modelo, esforço, tempo máximo e motivo da indisponibilidade). A chave nunca é exposta.
+- `GET /api/settings/backup`: `.zip` com uma cópia consistente do banco (`VACUUM INTO`), todas as imagens e um `manifest.json`. É gerado em arquivo temporário apagado ao fim do envio.
+- `GET /api/settings/export`: `.zip` com CSVs de supermercados, categorias, produtos, compras, itens e histórico de preços (mesmo formato dos relatórios, D53).
+- `GET /api/settings/images` e `DELETE /api/settings/images/orphans`: imagens armazenadas, em uso, órfãs e referências a arquivos ausentes.
+  - A exclusão recalcula a lista no servidor e remove pastas vazias.
+  - Imagens de leituras em andamento (pendente, processando, aguardando conferência, falha) nunca são órfãs.
+
+**Publicação**
+- A API serve a interface compilada (`Spa:RootPath`, padrão `wwwroot`) na mesma origem.
+  - Rotas do Angular devolvem `index.html` (`no-cache`); arquivos com hash recebem cache de 1 ano (`immutable`).
+  - Rotas `/api` desconhecidas continuam 404.
+- `appsettings.Production.json`: banco e imagens dentro da pasta publicada (recomendado sobrescrever por variáveis de ambiente) e CORS vazio (mesma origem).
+- `scripts/publish.ps1`: compila o Angular em produção, executa `dotnet publish` e copia a interface para `wwwroot`.
+- `Dockerfile` (multiestágio, usuário sem privilégios, volumes `/data` e `/uploads`) e `docker-compose.yml` (porta só em `127.0.0.1`).
+- Build Angular sem *critical CSS inline*: o script inline gerado seria bloqueado pela CSP (`script-src 'self'`) e a página ficaria sem estilos (D61).
+
+**Frontend**
+- **Login / primeiro acesso** (`/login`, fora do layout principal):
+  - Login com "manter conectado" e mostrar/ocultar senha.
+  - Cadastro inicial com confirmação de senha.
+  - Volta para a página pedida (`returnUrl`, somente caminhos internos).
+- **Guardas de rota e interceptador:**
+  - Sem sessão, a navegação vai para o login.
+  - Com a autenticação desligada, a aplicação abre direto.
+  - Com a API fora do ar, as telas mostram o erro de conexão.
+  - Um 401 durante o uso leva ao login, preservando a tela atual.
+- **Menu da conta** no cabeçalho (nome, e-mail, Configurações, Sair).
+- **Configurações** (`/settings`), especificação 4.8:
+  - Conta: dados e troca de senha.
+  - Preferências de exibição: período padrão do dashboard/relatórios e itens por página, guardados no navegador.
+  - Leitura por IA: situação e orientação para configurar a chave.
+  - Backup e exportação, com instruções de restauração.
+  - Imagens das notas: totais, órfãs e exclusão com confirmação.
+  - Sobre a instalação, com link para Categorias.
+- Página provisória removida; utilitário compartilhado de download (`shared/utils/download.ts`).
+
+**Revisão financeira**
+- Nenhum `double`/`float` em valores: só a contagem de páginas usa `double`.
+- Todas as divisões arredondam explicitamente com `DecimalPrecision.Round` (meio para longe do zero) e tratam divisor zero (participação, ticket médio, variação, médias, preço normalizado).
+- Nenhum `AVG` do SQLite (D4).
+- No frontend, cálculos monetários só pré-preenchem campos. O backend valida as casas decimais e é a fonte de verdade (D26).
+
 ## 4. Testes executados (2026-11-23)
 
 | Suíte | Resultado |
 |---|---|
-| Backend — `dotnet test` | **243 aprovados**, 0 falhas |
-| Frontend — `ng test` (Vitest) | **166 aprovados**, 0 falhas |
-| Build de produção Angular | OK (inicial ≈ 802 kB, ≈ 169 kB transferidos; ECharts em chunk sob demanda ≈ 160 kB; dashboard e relatórios em chunks próprios) |
+| Backend — `dotnet test` | **260 aprovados**, 0 falhas |
+| Frontend — `ng test` (Vitest) | **195 aprovados**, 0 falhas |
+| Build de produção Angular | OK (inicial ≈ 847 kB, ≈ 177 kB transferidos; ECharts em chunk sob demanda ≈ 160 kB; telas em chunks próprios) |
+| Publicação (`scripts/publish.ps1`) | OK — aplicação publicada executada em modo Production e verificada no navegador |
+| Imagem Docker | **Não construída** — o Docker está instalado, mas o serviço não estava em execução neste ambiente |
 | Verificação manual no navegador | Ver abaixo |
 | Chamada real à API da Anthropic | **Não executada** — não há chave configurada neste ambiente (seção 7) |
 
@@ -202,6 +265,24 @@
   - Consistência: dashboard = relatório mensal = soma das compras.
   - Exportações: CSV com BOM, `;` e vírgula decimal; Excel legível pelo ClosedXML; PDF válido.
   - Ponta a ponta HTTP: dashboard, relatórios, exportações com cabeçalhos e nome do arquivo, 422 e 400.
+- Fase 7:
+  - Autenticação:
+    - Primeiro acesso exige cadastro e protege a API (401 em ProblemDetails; `health` aberto).
+    - Cadastro grava hash (não a senha) e inicia sessão com cookie `HttpOnly`/`SameSite=Strict`; segundo cadastro → 409.
+    - Cadastro a partir de outro IP → 403; senha curta → 400.
+    - Logout; login errado/inexistente → 401 com mensagem genérica; e-mail sem diferenciar maiúsculas.
+    - Troca de senha: senha atual errada → 422 no campo; outras sessões encerradas; senha antiga recusada.
+    - Edição do perfil; 11ª tentativa de login → 429, sem afetar outro IP.
+    - Cabeçalhos de segurança; recuperação removendo só o usuário.
+  - Configurações:
+    - Informações da instalação, sem a chave.
+    - Backup extraído: o banco abre sozinho com os dados; imagem idêntica; manifesto.
+    - CSVs por entidade (aspas com `;`, vírgula decimal, data e hora).
+    - Imagens órfãs (imagem removida, nota excluída) listadas e excluídas sem afetar a imagem em uso.
+  - Publicação:
+    - Interface servida com cache correto e CSP.
+    - Rotas do Angular → `index.html`; `/api` desconhecida → 404.
+  - **Roteiro ponta a ponta da especificação (seção 11), com login ativo e leitor simulado:** enviar imagem → processar → conferir (associação de produtos) → confirmar → persistência → dashboard → histórico (R$ 27,90; R$ 5,58/kg) → editar (dashboard, histórico e relatórios mensal/supermercado/categoria atualizados para R$ 38,53) → excluir (tudo zerado).
 
 **Frontend — cobertura acumulada**
 - Fase 1: roteamento e títulos, `HealthService`, `toApiError`, indicador da API, layout, página provisória.
@@ -217,6 +298,17 @@
   - Formatação das células por tipo.
   - Dashboard: indicadores, gráficos e links com filtros, vazio, troca de filtros e erro.
   - Relatórios: tabela com linha de total, relatório/ranking pela URL e sincronização, exportação com os mesmos filtros, erro na exportação.
+- Fase 7:
+  - `AuthService`: status carregado uma vez, login, logout, senha e perfil.
+  - Guardas: redirecionamento com `returnUrl`; sessão ativa, autenticação desligada e API fora do ar abrem a aplicação; login bloqueado com sessão ativa.
+  - Interceptador: 401 → login, exceto nas rotas de autenticação.
+  - `safeReturnUrl` contra redirecionamento aberto.
+  - Página de login: entrar e voltar à página pedida, credenciais erradas, cadastro com validação de senha e confirmação, recusa do cadastro remoto.
+  - Rotas: sem sessão → login com `returnUrl`; primeiro acesso; autenticação desligada.
+  - Menu da conta e saída.
+  - Preferências (persistência, valores inválidos, leitura inicial) e período padrão aplicado aos filtros.
+  - Nome de arquivo do `Content-Disposition`, tamanho legível, serviço de configurações.
+  - Página de configurações: informações, IA, imagens, conta oculta sem autenticação, preferências, exclusão de órfãs com confirmação e recarga, backup, troca de senha e perfil.
 
 **Verificação manual (navegador)**
 - Fase 2: listagem de categorias; cadastro de supermercado com CNPJ inválido (erro do backend exibido no campo) e depois válido; cadastro de produto com redirecionamento aos detalhes; inclusão de descrição alternativa e rejeição de equivalente com acento/caixa diferentes; paginador em português; layout a 375 px.
@@ -229,6 +321,18 @@
   - Relatórios: mensal com subtotal anual; produtos por maior aumento (Arroz +20,08%); comparação com o período anterior de mesma duração (+4,46%); troca de relatório pelo seletor, atualizando a URL.
   - Exportações baixadas pela API: CSV (BOM, `;`, vírgula decimal), xlsx válido e PDF conferido visualmente.
   - Corrigidos durante a verificação: rótulos do eixo de valores sobrepostos nos gráficos estreitos, e cor do indicador em destaque (verde-limão forte, trocado pelo contêiner secundário do tema).
+- Fase 7 (aplicação **publicada** pelo script, em modo Production, com banco temporário):
+  - Interface servida pela API com a CSP restritiva: estilos e fontes carregados, sem erros no console.
+  - `/settings` sem sessão → login com `returnUrl` → primeiro acesso → cadastro → volta para Configurações.
+  - Configurações exibindo conta, preferências, IA indisponível com o motivo, backup/exportação, imagens e instalação.
+  - Backup e exportação gerados pela sessão (`.zip` válidos, nomes com data e hora).
+  - Sair pelo menu da conta → link protegido para relatório → login. Senha errada mostra "E-mail ou senha incorretos."; a correta volta ao relatório pedido.
+  - Período padrão "Este ano" aplicado ao abrir o dashboard.
+  - Corrigidos durante a verificação:
+    - Arquivos JS/CSS respondidos com o `index.html`: a rota de fallback era escolhida antes dos arquivos estáticos; agora `UseRouting` vem depois.
+    - Script inline do *critical CSS* bloqueado pela CSP.
+    - Tamanho do banco sem o arquivo `-wal`.
+    - Acentos corrompidos na saída do script de publicação no Windows PowerShell 5.1 (arquivo salvo com BOM).
 - Os registros e as imagens criados nas verificações foram excluídos do banco e da pasta de uploads locais.
 
 ## 5. Decisões técnicas
@@ -246,12 +350,12 @@
 | D9 | **Unicidade**: CNPJ, chave de acesso e código de barras únicos quando informados; categoria única sem diferenciar maiúsculas (`NOCASE`); descrição alternativa única por produto (forma normalizada). | RN02, 4.3, 4.4. |
 | D10 | **CNPJ opcional** no supermercado (ex.: feiras). | Não bloquear compras legítimas. |
 | D11 | **`ReceiptItem.Unit` como texto livre**; `Product.Unit` usa o enum da especificação. | Preservar o texto da nota. |
-| D12 | **Entidade `Usuario` adiada para a Fase 7**, com a autenticação. Até lá, a API deve rodar apenas em `localhost`. | Evita tabela sem uso; risco documentado no README. |
+| D12 | **Entidade `Usuario` adiada para a Fase 7**, com a autenticação (implementada: D56). | Evita tabela sem uso. |
 | D13 | **Datas**: `IssuedAt` no horário local da nota; `CreatedAt`/`UpdatedAt`/`ProcessedAt` em UTC; sem `DateTimeOffset`. | Consultas por período no SQLite. |
 | D14 | **Swagger**: OpenAPI nativo + `Swashbuckle.AspNetCore.SwaggerUI`. | Padrão do .NET 10. |
 | D15 | **Pacotes EF Core e `Mvc.Testing` fixados em 10.0.x** (a 11.0 exige .NET 11). | .NET 10 LTS. |
 | D16 | **Frontend chama `/api` relativo**, com proxy no desenvolvimento. | Sem URLs fixas. |
-| D17 | **Apache ECharts** será instalado na Fase 5. | Não carregar dependência sem uso. |
+| D17 | **Apache ECharts** instalado na Fase 5 (D48). | Não carregar dependência sem uso. |
 | D18 | **Validação com DataAnnotations** (atributos próprios em `Validators/`) + regras no Service. **FluentValidation não foi adotado**: os atributos cobrem os casos com menos código. | A especificação o trata como opcional. |
 | D19 | **CNPJ alfanumérico suportado** (vigente desde jul/2026): 12 caracteres `[0-9A-Z]` + 2 dígitos verificadores, valor de cada caractere = ASCII − 48. Armazenado sem máscara, em maiúsculas. | Novos CNPJs já podem ser alfanuméricos. |
 | D20 | **Erros por campo em camelCase** (`SystemTextJsonValidationMetadataProvider`); regras de negócio usam as mesmas chaves (ex.: `categoryId`, `sortBy`). | Associação direta aos controles do formulário. |
@@ -266,7 +370,7 @@
 | D29 | **Fluxo manual = rascunho + confirmação** (`POST` e depois `PUT .../confirm`). Se o usuário recusar os alertas, a compra fica como rascunho, visível na listagem. | Endpoints da especificação; RN01. |
 | D30 | **Histórico de preços gerado já na Fase 3**, sem preço normalizado. A Fase 5 adiciona a normalização e recalcula as observações existentes. | Mantém RN03/RN04/RN05 consistentes desde a primeira compra, sem migração de dados depois. |
 | D31 | **Descrições aprendidas na confirmação**: associação item → produto feita pelo usuário vira descrição alternativa confirmada (origem `Receipt`). A sugestão automática no frontend só preenche quando há exatamente uma associação confirmada e ativa. | Associações ambíguas devem ser confirmadas pelo usuário (4.4). |
-| D32 | **Imagens nunca são apagadas pela aplicação**: remover/substituir a imagem ou excluir a nota apenas desvincula. O gerenciamento de arquivos órfãos fica para Configurações (Fase 7). | "Preservar imagens originais" (6.3); evita perda acidental. |
+| D32 | **Imagens nunca são apagadas pela aplicação**: remover/substituir a imagem ou excluir a nota apenas desvincula. O gerenciamento de arquivos órfãos está em Configurações (D60). | "Preservar imagens originais" (6.3); evita perda acidental. |
 | D33 | **Datas de auditoria lidas como UTC** por conversor no `AppDbContext` (`CreatedAt`, `UpdatedAt`, `ProcessedAt`). | Sem o "Z", o navegador exibia o horário UTC como local. |
 | D34 | **Chave de acesso com CNPJ alfanumérico**: posições 7–20 aceitam `[0-9A-Z]`; DV por módulo 11 com valor = ASCII − 48 (mesma regra do CNPJ alfanumérico). | Notas de emitentes com CNPJ alfanumérico. |
 | D35 | **Provedor: Anthropic (Claude), SDK oficial .NET**, modelo padrão `claude-opus-5-5`, esforço `medium`, configuráveis. Trocar de provedor = nova implementação de `IReceiptReader` + `ReceiptReaderFactory`. | Modelo multimodal atual com saída estruturada; SDK oficial em vez de HTTP manual. |
@@ -291,21 +395,31 @@
 | D53 | **CSV no padrão do Excel em português**: separador `;`, vírgula decimal, UTF-8 com BOM, valores sem símbolo de moeda. | Abre corretamente com duplo clique no Excel pt-BR e continua legível por outras ferramentas. |
 | D54 | **ClosedXML (MIT) para Excel e QuestPDF (licença Community) para PDF.** A licença é declarada em `Program.cs`; a Community é gratuita para uso pessoal e para organizações com receita anual abaixo de US$ 1 milhão. | Bibliotecas maduras e sem dependências nativas; nenhuma geração de arquivo no navegador. |
 | D55 | **Filtros do dashboard e dos relatórios na URL** (`period`, `from`, `to`, `storeId`, `categoryId`, `report`, `ranking`). | Links "Ver relatório" levam a tabela com os mesmos filtros (a tabela é a alternativa acessível ao gráfico); recarregar ou compartilhar mantém a análise. |
+| D56 | **Autenticação por cookie de sessão, ligada por padrão**, com usuário único (completa D12). Login por e-mail; sem recuperação por e-mail: a recuperação é feita no servidor (`Authentication:ResetUser`). | Seção 10: simples, sem multi-tenancy; o cookie `HttpOnly` não fica acessível a scripts (ao contrário de um token no `localStorage`). |
+| D57 | **Cadastro inicial só a partir do próprio computador** (loopback), salvo `AllowRemoteSetup`. | Evita que alguém na rede "tome posse" da instalação antes do dono. |
+| D58 | **Proteção contra CSRF por `SameSite=Strict`** + CORS restrito + corpo JSON, sem token antiforgery. | Navegadores atuais não enviam o cookie em requisições de outros sites; menos complexidade para um único usuário. |
+| D59 | **Backup = cópia consistente do banco (`VACUUM INTO`) + imagens, em .zip; restauração manual documentada**, sem endpoint de restauração. A exportação em CSV é separada. | Substituir o banco com a aplicação em execução é arriscado; a restauração manual é rara e explícita. |
+| D60 | **Imagens órfãs só são apagadas pelo usuário** (Configurações), com a lista recalculada no servidor; leituras em andamento protegem suas imagens. Completa D32. | Nada é apagado automaticamente; o usuário revisa antes. |
+| D61 | **Interface publicada pela própria API** (mesma origem), com CSP `script-src 'self'` e *critical CSS* inline desativado no build. | Um processo só, sem CORS; a CSP impede scripts injetados. |
+| D62 | **Preferências de exibição no navegador** (`localStorage`): período padrão e itens por página. | São preferências do dispositivo, não dados da aplicação; sem tabela nem endpoint. |
+| D63 | **Docker opcional** (compose com porta só em `127.0.0.1` e cadastro remoto liberado por isso). | Especificação 2.5: Docker não é obrigatório para execução local. |
 
 ## 6. Funcionalidades pendentes
 
-- Fase 4: validar a leitura real com uma chave da Anthropic e fotos de notas reais (ajustar prompt/esforço se necessário).
-- Fase 7: conforme a tabela da seção 1 e a seção 8.
+Todas as fases do planejamento (seção 13 da especificação) foram implementadas. Restam validações que dependem de recursos externos:
+
+- Validar a leitura real com uma chave da Anthropic e fotos de notas reais (ajustar prompt/esforço se necessário).
+- Construir e executar a imagem Docker em um ambiente com o serviço do Docker ativo.
+- Publicação em servidor com HTTPS (proxy reverso) quando houver necessidade de acesso remoto.
 
 ## 7. Problemas conhecidos
 
 - Nenhum problema crítico.
 - A busca textual usa `LIKE` do SQLite, que ignora maiúsculas/minúsculas apenas em ASCII: "laticinios" não encontra "Laticínios" pelo nome (a busca por descrições alternativas já ignora acentos). Avaliar uma coluna normalizada de busca se isso incomodar no uso.
 - A ordenação alfabética do SQLite é binária: nomes iniciados por letra acentuada (ex.: "Água") aparecem depois do "Z".
-- O bundle inicial está em ≈ 792 kB (≈ 167 kB transferidos), abaixo do limite de aviso (1 MB). Revisar na Fase 7.
+- O bundle inicial está em ≈ 847 kB (≈ 177 kB transferidos), abaixo do limite de aviso (1 MB); as telas e o ECharts são carregados sob demanda.
 - Fontes e ícones vêm do Google Fonts; sem internet, a interface usa fontes de reserva.
-- A API ainda não tem autenticação (D12).
-- Imagens desvinculadas ou de notas excluídas permanecem em `uploads/` (D32) até existir o gerenciamento de imagens (Fase 7).
+- Imagens desvinculadas ou de notas excluídas permanecem em `uploads/` até o usuário excluí-las em Configurações (D60); a página de uma leitura antiga cuja imagem foi excluída mostra a imagem ausente.
 - Os campos numéricos usam `<input type="number">`: o separador decimal exibido depende do navegador (ponto ou vírgula).
 - **A leitura real pela API da Anthropic ainda não foi executada**: não há chave neste ambiente. A integração foi escrita com o SDK oficial e compila; o tratamento de respostas, erros e o fluxo completo foram testados com um leitor simulado. Com a chave configurada (README → "Leitura de notas por IA"), validar com fotos reais.
 - Fotos HEIC (padrão do iPhone) não são aceitas; o usuário precisa enviar JPEG/PNG/WebP. Fotos acima de 5 MB precisam ser reduzidas antes do envio.
@@ -316,7 +430,16 @@
 - Dashboard e relatórios agregam em memória as compras confirmadas do período (somas exatas em `decimal`); adequado ao volume de uso pessoal. Para volumes muito grandes, mover as somas para SQL sobre os inteiros escalados.
 - Nos primeiros instantes após abrir o dashboard, enquanto o menu lateral termina de abrir, o gráfico mensal pode aparecer estreito; o ECharts se ajusta sozinho ao tamanho final.
 - O PDF usa as fontes padrão do QuestPDF (Lato); nomes com caracteres fora do latim podem não ser exibidos.
+- No Linux/Docker, as chaves de sessão em `data/keys` não são criptografadas em repouso (o ASP.NET Core registra um aviso); protegem apenas os cookies, e quem lê essa pasta já tem acesso ao banco.
+- Em produção sem HTTPS (uso local), o ASP.NET Core registra o aviso "Failed to determine the https port for redirect"; é esperado. Com proxy HTTPS, habilite `ReverseProxy:Enabled`.
+- A autenticação usa um único usuário, sem recuperação por e-mail; a recuperação exige acesso ao servidor (README → "Senha esquecida").
+- Preferências de exibição valem por navegador (D62).
 
-## 8. Próxima etapa — Fase 7 (Qualidade e entrega)
+## 8. Próximos passos
 
-Conforme a especificação: autenticação (entidade `Usuario`, D12), backup e restauração do banco, gerenciamento de imagens órfãs (D32), revisão de segurança (cabeçalhos, limites, CORS de produção), tela de Configurações, revisão de acessibilidade e de desempenho, e documentação de publicação.
+O planejamento da especificação foi concluído (Fases 1 a 7) e todos os critérios de aceitação da seção 12 têm implementação e testes. A leitura por IA com dados reais é o único critério ainda não verificado, por falta de chave neste ambiente. Sugestões para o uso real:
+
+1. Configurar a chave da Anthropic e validar a leitura com fotos de notas reais (diferentes supermercados, notas longas, fotos inclinadas), ajustando prompt e esforço se necessário.
+2. Usar a aplicação no dia a dia e fazer backups periódicos fora do computador.
+3. Construir a imagem Docker com o serviço ativo (`docker compose up -d --build`), se for usar contêiner.
+4. Avaliar melhorias registradas na seção 7, conforme o incômodo no uso: busca sem acentos pelo nome, ordenação com acentos e campos numéricos com vírgula.

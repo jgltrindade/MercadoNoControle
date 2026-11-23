@@ -23,7 +23,8 @@ import { ConfirmService } from '../../shared/components/confirm-dialog/confirm-d
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { PageToolbar } from '../../shared/components/page-toolbar/page-toolbar';
 import { SearchPicker } from '../../shared/components/search-picker/search-picker';
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, SortDirection } from '../../shared/models/paging';
+import { PreferencesService } from '../../core/services/preferences.service';
+import { PAGE_SIZE_OPTIONS, SortDirection } from '../../shared/models/paging';
 import { latestValue } from '../../shared/utils/resource';
 import { StoresService } from '../supermarkets/stores.service';
 import { ReceiptPickers, StoreRef, storeDescription, storeName, toStoreRef } from './pickers';
@@ -91,7 +92,7 @@ export class ReceiptsPage implements OnInit {
   private readonly from = signal<string | null>(null);
   private readonly to = signal<string | null>(null);
   protected readonly pageIndex = signal(0);
-  protected readonly pageSize = signal(DEFAULT_PAGE_SIZE);
+  protected readonly pageSize = signal(inject(PreferencesService).preferences().pageSize);
   protected readonly sort = signal<{ active: string; direction: SortDirection }>({ active: 'issuedAt', direction: 'desc' });
 
   protected readonly query = computed<ReceiptQuery>(() => ({

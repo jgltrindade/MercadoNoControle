@@ -6,6 +6,7 @@ namespace MercadoNoControle.Api.Controllers;
 
 [ApiController]
 [Route("api/health")]
+[Microsoft.AspNetCore.Authorization.AllowAnonymous]
 public class HealthController(ISystemStatusService systemStatusService) : ControllerBase
 {
     /// <summary>Verifica se a API e o banco de dados estão disponíveis.</summary>

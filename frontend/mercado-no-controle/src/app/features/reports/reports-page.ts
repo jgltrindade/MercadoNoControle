@@ -9,11 +9,13 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { Router } from '@angular/router';
 import { toApiError } from '../../core/api/api-error';
+import { PreferencesService } from '../../core/services/preferences.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
+import { saveFile } from '../../shared/utils/download';
 import { StoreRef, toStoreRef } from '../receipts/pickers';
 import { StoresService } from '../supermarkets/stores.service';
-import { AnalyticsFilterState, AnalyticsFilters, filtersFromParams, filtersToParams, toAnalyticsQuery } from '../dashboard/analytics-filters';
+import { AnalyticsFilterState, AnalyticsFilters, defaultFilters, filtersFromParams, filtersToParams, toAnalyticsQuery } from '../dashboard/analytics-filters';
 import { AnalyticsService, ExportFormat, ReportColumnType, ReportKey, ReportQuery } from '../dashboard/analytics.service';
 
 export const REPORT_OPTIONS: readonly { value: ReportKey; label: string }[] = [
@@ -82,6 +84,7 @@ export class ReportsPage implements OnInit {
   private readonly storesService = inject(StoresService);
   private readonly notification = inject(NotificationService);
   private readonly router = inject(Router);
+  private readonly preferences = inject(PreferencesService);
 
   // Estado vindo da URL.
   readonly report = input<string>();
@@ -130,7 +133,7 @@ export class ReportsPage implements OnInit {
       to: this.to(),
       storeId: this.storeId(),
       categoryId: this.categoryId(),
-    });
+    }, defaultFilters(this.preferences.preferences().analyticsPeriod));
     this.filters.set(initial);
     if (initial.storeId) {
       this.storesService.get(initial.storeId).subscribe({ next: (store) => this.initialStore.set(toStoreRef(store)), error: () => undefined });
@@ -185,14 +188,4 @@ export class ReportsPage implements OnInit {
       replaceUrl: true,
     });
   }
-}
-
-/** Dispara o download de um arquivo no navegador. */
-export function saveFile(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

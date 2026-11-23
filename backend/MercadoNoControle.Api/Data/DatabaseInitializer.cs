@@ -31,5 +31,15 @@ public static class DatabaseInitializer
         {
             logger.LogInformation("Preço normalizado recalculado em {Count} observação(ões) de preço.", recalculated);
         }
+
+        // Senha esquecida: com Authentication:ResetUser=true o usuário é removido (dados preservados)
+        // e o próximo acesso pede o cadastro inicial. A opção deve ser retirada em seguida.
+        if (app.Configuration.GetValue<bool>("Authentication:ResetUser"))
+        {
+            var removed = await Services.Auth.AuthService.ResetUsersAsync(db, cancellationToken);
+            logger.LogWarning(
+                "Authentication:ResetUser ativo: {Count} usuário(s) removido(s). Faça o cadastro inicial e remova a opção da configuração.",
+                removed);
+        }
     }
 }

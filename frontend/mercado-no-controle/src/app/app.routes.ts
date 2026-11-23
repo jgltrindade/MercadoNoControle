@@ -1,11 +1,19 @@
 import { Routes } from '@angular/router';
+import { authGuard, guestGuard } from './core/auth/auth.guards';
 import { Shell } from './core/layout/shell/shell';
 
 /** Rotas principais. Cada funcionalidade é carregada sob demanda (lazy loading). */
 export const routes: Routes = [
   {
+    path: 'login',
+    title: 'Entrar',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./features/auth/login-page').then((m) => m.LoginPage),
+  },
+  {
     path: '',
     component: Shell,
+    canActivate: [authGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {

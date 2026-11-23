@@ -70,3 +70,22 @@
     padding: 16px;
   }
 }
+
+.shell__user {
+  margin-left: 4px;
+}
+
+.shell__user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 16px 12px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  margin-bottom: 4px;
+  font: var(--mat-sys-body-medium);
+
+  span {
+    color: var(--mat-sys-on-surface-variant);
+    font: var(--mat-sys-body-small);
+  }
+}

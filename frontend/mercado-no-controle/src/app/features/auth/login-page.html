@@ -1,0 +1,87 @@
+<main class="login">
+  <mat-card appearance="outlined" class="login__card">
+    <div class="login__brand">
+      <mat-icon class="login__brand-icon">shopping_cart_checkout</mat-icon>
+      <span>{{ appName }}</span>
+    </div>
+
+    @if (setupRequired()) {
+      <h1 class="login__title">Primeiro acesso</h1>
+      <p class="login__lead">Crie o usuário que terá acesso à aplicação. Guarde a senha: ela não pode ser recuperada por e-mail.</p>
+
+      <form [formGroup]="setupForm" (ngSubmit)="submitSetup()" class="login__form" novalidate>
+        <mat-form-field>
+          <mat-label>Nome</mat-label>
+          <input matInput formControlName="name" autocomplete="name" />
+          <mat-error>{{ errorMessage(setupForm.controls.name) }}</mat-error>
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>E-mail</mat-label>
+          <input matInput type="email" formControlName="email" autocomplete="username" />
+          <mat-error>{{ errorMessage(setupForm.controls.email) }}</mat-error>
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Senha</mat-label>
+          <input matInput [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'"
+            (click)="showPassword.set(!showPassword())"
+          >
+            <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-hint>Mínimo de {{ minLength }} caracteres.</mat-hint>
+          <mat-error>{{ errorMessage(setupForm.controls.password) }}</mat-error>
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Confirmar senha</mat-label>
+          <input matInput [type]="showPassword() ? 'text' : 'password'" formControlName="confirmPassword" autocomplete="new-password" />
+          <mat-error>{{ errorMessage(setupForm.controls.confirmPassword) }}</mat-error>
+        </mat-form-field>
+
+        @if (error(); as message) {
+          <p class="login__error" role="alert">{{ message }}</p>
+        }
+
+        <button mat-flat-button type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Criando…' : 'Criar usuário e entrar' }}
+        </button>
+      </form>
+    } @else {
+      <h1 class="login__title">Entrar</h1>
+
+      <form [formGroup]="loginForm" (ngSubmit)="submitLogin()" class="login__form" novalidate>
+        <mat-form-field>
+          <mat-label>E-mail</mat-label>
+          <input matInput type="email" formControlName="email" autocomplete="username" />
+          <mat-error>{{ errorMessage(loginForm.controls.email) }}</mat-error>
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Senha</mat-label>
+          <input matInput [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'"
+            (click)="showPassword.set(!showPassword())"
+          >
+            <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-error>{{ errorMessage(loginForm.controls.password) }}</mat-error>
+        </mat-form-field>
+        <mat-checkbox formControlName="rememberMe">Manter conectado neste navegador</mat-checkbox>
+
+        @if (error(); as message) {
+          <p class="login__error" role="alert">{{ message }}</p>
+        }
+
+        <button mat-flat-button type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Entrando…' : 'Entrar' }}
+        </button>
+      </form>
+    }
+  </mat-card>
+</main>

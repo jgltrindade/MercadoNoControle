@@ -36,10 +36,14 @@ public sealed record StoragePaths(string DatabaseFile, string UploadsDirectory)
 
     public string ConnectionString => $"Data Source={DatabaseFile}";
 
-    /// <summary>Garante a existência dos diretórios do banco e das imagens.</summary>
+    /// <summary>Chaves de proteção do cookie de sessão, ao lado do banco (não entram no backup).</summary>
+    public string KeysDirectory => Path.Combine(Path.GetDirectoryName(DatabaseFile)!, "keys");
+
+    /// <summary>Garante a existência dos diretórios do banco, das chaves e das imagens.</summary>
     public void EnsureDirectories()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(DatabaseFile)!);
+        Directory.CreateDirectory(KeysDirectory);
         Directory.CreateDirectory(UploadsDirectory);
     }
 }

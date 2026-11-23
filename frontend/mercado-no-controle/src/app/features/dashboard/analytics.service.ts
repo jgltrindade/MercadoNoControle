@@ -1,8 +1,11 @@
-import { HttpClient, HttpResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { API_BASE_URL } from '../../core/api/api-config';
 import { toHttpParams } from '../../shared/models/paging';
+import { DownloadedFile, toDownloadedFile } from '../../shared/utils/download';
+
+export type { DownloadedFile };
 
 /** Filtros comuns do dashboard e dos relatórios ("aaaa-MM-dd", inclusive). */
 export interface AnalyticsQuery {
@@ -84,11 +87,6 @@ export interface ReportQuery extends AnalyticsQuery {
   ranking?: 'purchases' | 'spent' | 'increase' | null;
 }
 
-export interface DownloadedFile {
-  blob: Blob;
-  fileName: string;
-}
-
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private readonly http = inject(HttpClient);
@@ -126,16 +124,6 @@ export class AnalyticsService {
         responseType: 'blob',
         observe: 'response',
       })
-      .pipe(map((response) => ({ blob: response.body!, fileName: fileNameOf(response) ?? `relatorio-${key}.${format}` })));
+      .pipe(map((response) => toDownloadedFile(response, `relatorio-${key}.${format}`)));
   }
-}
-
-function fileNameOf(response: HttpResponse<Blob>): string | null {
-  const disposition = response.headers.get('Content-Disposition') ?? '';
-  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
-  if (encoded) {
-    return decodeURIComponent(encoded[1]);
-  }
-  const plain = /filename="?([^";]+)"?/i.exec(disposition);
-  return plain ? plain[1] : null;
 }

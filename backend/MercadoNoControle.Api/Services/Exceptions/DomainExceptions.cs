@@ -17,3 +17,6 @@ public class BusinessRuleException(string message, IDictionary<string, string[]>
 {
     public IDictionary<string, string[]> Errors { get; } = errors ?? new Dictionary<string, string[]>();
 }
+
+/// <summary>Credenciais inválidas ou sessão ausente → HTTP 401.</summary>
+public class UnauthorizedException(string message) : Exception(message);

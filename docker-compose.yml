@@ -1,0 +1,22 @@
+# Execução opcional com Docker. A porta fica restrita a este computador (127.0.0.1).
+# Para acessar de outros dispositivos, publique atrás de um proxy reverso com HTTPS (README → "Publicação").
+services:
+  mercado-no-controle:
+    build: .
+    image: mercado-no-controle
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      # Leitura de notas por IA (opcional). Defina ANTHROPIC_API_KEY no ambiente ou em um arquivo .env (não versionado).
+      ReceiptReader__ApiKey: ${ANTHROPIC_API_KEY:-}
+      # Dentro do contêiner o navegador não aparece como "local"; como a porta só é publicada em
+      # 127.0.0.1, o cadastro inicial continua restrito a este computador.
+      Authentication__AllowRemoteSetup: "true"
+    volumes:
+      - mnc-data:/data
+      - mnc-uploads:/uploads
+    restart: unless-stopped
+
+volumes:
+  mnc-data:
+  mnc-uploads:

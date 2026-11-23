@@ -7,7 +7,7 @@ namespace MercadoNoControle.Tests.Infrastructure;
 /// <summary>
 /// Sobe a API real com banco SQLite e diretório de imagens temporários e isolados.
 /// </summary>
-public sealed class ApiFactory : WebApplicationFactory<Program>
+public class ApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _rootDirectory = Path.Combine(Path.GetTempPath(), "mnc-tests", Guid.NewGuid().ToString("N"));
 
@@ -15,12 +15,16 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public string UploadsDirectory => Path.Combine(_rootDirectory, "uploads");
 
+    protected virtual bool AuthenticationEnabled => false;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("Storage:DatabasePath", DatabaseFile);
         builder.UseSetting("Storage:UploadsPath", UploadsDirectory);
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:4200");
+        // Os testes de cada recurso não dependem de login; AuthEndpointsTests cobre a autenticação.
+        builder.UseSetting("Authentication:Enabled", AuthenticationEnabled ? "true" : "false");
     }
 
     protected override void Dispose(bool disposing)

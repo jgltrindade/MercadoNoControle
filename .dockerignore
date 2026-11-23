@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.angular
+**/bin
+**/obj
+**/coverage
+**/TestResults
+data
+uploads
+publish
+.git
+.claude
+**/*.db
+**/wwwroot

@@ -1,5 +1,5 @@
 import { registerLocaleData } from '@angular/common';
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import localePt from '@angular/common/locales/pt';
 import {
   ApplicationConfig,
@@ -16,6 +16,7 @@ import { PtBrPaginatorIntl } from './core/i18n/paginator-intl';
 import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideEchartsCore } from 'ngx-echarts';
 import { routes } from './app.routes';
+import { authInterceptor } from './core/auth/auth.guards';
 import { AppTitleStrategy } from './core/layout/app-title.strategy';
 
 registerLocaleData(localePt);
@@ -24,7 +25,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withFetch()),
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
     { provide: TitleStrategy, useExisting: AppTitleStrategy },
     { provide: LOCALE_ID, useValue: 'pt-BR' },
     { provide: DEFAULT_CURRENCY_CODE, useValue: 'BRL' },

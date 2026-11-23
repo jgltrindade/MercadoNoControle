@@ -17,6 +17,7 @@ public sealed class GlobalExceptionHandler(
         var problem = exception switch
         {
             NotFoundException e => Create(StatusCodes.Status404NotFound, "Recurso não encontrado", e.Message),
+            UnauthorizedException e => Create(StatusCodes.Status401Unauthorized, "Não autenticado", e.Message),
             ConflictException e => CreateConflict(e),
             BusinessRuleException e => CreateBusinessRule(e),
             OperationCanceledException when httpContext.RequestAborted.IsCancellationRequested =>

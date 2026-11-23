@@ -8,6 +8,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { toApiError } from '../../core/api/api-error';
+import { PreferencesService } from '../../core/services/preferences.service';
 import { toIsoDate } from '../../core/i18n/date-adapter';
 import { buildColumnOption, buildGroupedBarOption, buildHorizontalBarOption } from '../../shared/charts/chart-theme';
 import { AppChart } from '../../shared/components/chart/chart';
@@ -17,6 +18,7 @@ import { StoresService } from '../supermarkets/stores.service';
 import {
   AnalyticsFilterState,
   AnalyticsFilters,
+  defaultFilters,
   filtersFromParams,
   filtersToParams,
   toAnalyticsQuery,
@@ -66,6 +68,7 @@ export class DashboardPage implements OnInit {
   private readonly service = inject(AnalyticsService);
   private readonly storesService = inject(StoresService);
   private readonly router = inject(Router);
+  private readonly preferences = inject(PreferencesService);
 
   // Filtros vindos da URL (component input binding de query params).
   readonly period = input<string>();
@@ -149,7 +152,7 @@ export class DashboardPage implements OnInit {
       to: this.to(),
       storeId: this.storeId(),
       categoryId: this.categoryId(),
-    });
+    }, defaultFilters(this.preferences.preferences().analyticsPeriod));
     this.filters.set(initial);
     if (initial.storeId) {
       this.storesService.get(initial.storeId).subscribe({ next: (store) => this.initialStore.set(toStoreRef(store)), error: () => undefined });
