@@ -11,6 +11,9 @@ import { applyServerErrors, cnpjFormat, emptyToNull, fieldErrorMessage } from '.
 import { formatCnpj } from '../../shared/pipes/cnpj.pipe';
 import { BRAZILIAN_STATES, Store, StoreRequest, StoresService } from './stores.service';
 
+/** Dados do diálogo: supermercado a editar, valores iniciais de um novo cadastro, ou nada. */
+export type StoreFormData = Store | { prefill: Partial<Pick<Store, 'tradeName' | 'legalName' | 'cnpj'>> } | null;
+
 @Component({
   selector: 'app-store-form-dialog',
   imports: [ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule],
@@ -21,7 +24,11 @@ export class StoreFormDialog {
   private readonly service = inject(StoresService);
   private readonly notification = inject(NotificationService);
   private readonly dialogRef = inject<MatDialogRef<StoreFormDialog, Store>>(MatDialogRef);
-  protected readonly store = inject<Store | null>(MAT_DIALOG_DATA, { optional: true });
+  private readonly data = inject<StoreFormData>(MAT_DIALOG_DATA, { optional: true });
+  /** Supermercado em edição; nulo no cadastro. */
+  protected readonly store = this.data && 'id' in this.data ? this.data : null;
+  /** Valores iniciais de um novo cadastro (ex.: lidos da nota fiscal). */
+  private readonly prefill = this.data && 'prefill' in this.data ? this.data.prefill : null;
 
   protected readonly states = BRAZILIAN_STATES;
   protected readonly errorMessage = fieldErrorMessage;
@@ -29,9 +36,9 @@ export class StoreFormDialog {
   protected readonly formError = signal<string | null>(null);
 
   protected readonly form = inject(FormBuilder).nonNullable.group({
-    tradeName: [this.store?.tradeName ?? '', [Validators.required, Validators.maxLength(150)]],
-    legalName: [this.store?.legalName ?? '', [Validators.maxLength(200)]],
-    cnpj: [formatCnpj(this.store?.cnpj), [cnpjFormat]],
+    tradeName: [this.store?.tradeName ?? this.prefill?.tradeName ?? '', [Validators.required, Validators.maxLength(150)]],
+    legalName: [this.store?.legalName ?? this.prefill?.legalName ?? '', [Validators.maxLength(200)]],
+    cnpj: [formatCnpj(this.store?.cnpj ?? this.prefill?.cnpj), [cnpjFormat]],
     address: [this.store?.address ?? '', [Validators.maxLength(250)]],
     city: [this.store?.city ?? '', [Validators.maxLength(100)]],
     state: [this.store?.state ?? ''],

@@ -2,6 +2,8 @@ using System.Text.Json.Serialization;
 using MercadoNoControle.Api.Configuration;
 using MercadoNoControle.Api.Data;
 using MercadoNoControle.Api.Services;
+using MercadoNoControle.Api.Services.Ai;
+using MercadoNoControle.Api.Services.Imports;
 using MercadoNoControle.Api.Services.Receipts;
 using MercadoNoControle.Api.Services.Storage;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
@@ -33,6 +35,15 @@ builder.Services.AddScoped<IReceiptService, ReceiptService>();
 builder.Services.AddScoped<PriceObservationRecorder>();
 builder.Services.Configure<ImageUploadOptions>(builder.Configuration.GetSection(ImageUploadOptions.SectionName));
 builder.Services.AddSingleton<IReceiptImageStorage, ReceiptImageStorage>();
+
+// Leitura de notas por IA: provedor escolhido por configuração; sem chave, o cadastro manual continua disponível.
+builder.Services.Configure<ReceiptReaderOptions>(builder.Configuration.GetSection(ReceiptReaderOptions.SectionName));
+builder.Services.AddSingleton<IReceiptReader>(ReceiptReaderFactory.Create);
+builder.Services.AddSingleton<ReceiptImportQueue>();
+builder.Services.AddScoped<ReceiptImportProcessor>();
+builder.Services.AddScoped<ReceiptDraftBuilder>();
+builder.Services.AddScoped<IReceiptImportService, ReceiptImportService>();
+builder.Services.AddHostedService<ReceiptImportWorker>();
 
 builder.Services
     .AddControllers(options =>

@@ -1,8 +1,8 @@
 # Status de Desenvolvimento — Mercado no Controle
 
 **Última atualização:** 2026-11-23
-**Fase atual:** Fase 3 — Compras ✅ concluída
-**Próxima etapa:** Fase 4 — Inteligência artificial
+**Fase atual:** Fase 4 — Inteligência artificial ✅ concluída (leitura real pendente de validação com chave configurada — ver seção 7)
+**Próxima etapa:** Fase 5 — Histórico de preços
 
 ---
 
@@ -13,8 +13,8 @@
 | 1 | Fundação | ✅ Concluída |
 | 2 | Cadastros (supermercados, categorias, produtos, descrições alternativas) | ✅ Concluída |
 | 3 | Compras (cadastro manual, itens, upload de imagens, duplicidade) | ✅ Concluída |
-| 4 | Inteligência artificial (`IReceiptReader`, conferência, confirmação) | ⏳ Próxima |
-| 5 | Histórico de preços (registro, normalização, comparação, gráficos) | Pendente |
+| 4 | Inteligência artificial (`IReceiptReader`, conferência, confirmação) | ✅ Concluída |
+| 5 | Histórico de preços (registro, normalização, comparação, gráficos) | ⏳ Próxima |
 | 6 | Dashboard e relatórios (indicadores, filtros, exportações) | Pendente |
 | 7 | Qualidade e entrega (autenticação, backup, segurança, publicação) | Pendente |
 
@@ -98,29 +98,57 @@
 - **Detalhes da compra** (`/receipts/:id`): cabeçalho, situação, alertas e possíveis duplicatas (com links), itens com produto ou "não identificado", totais, imagem (anexar, substituir, remover) e ações de editar, confirmar e excluir.
 - Adaptador de datas pt-BR (`dd/MM/aaaa` digitado corretamente).
 
+### Fase 4 — Inteligência artificial
+
+**Backend**
+- **`IReceiptReader`** (`Services/Ai`): contrato da especificação (5.4) mais nome do provedor/modelo e disponibilidade. `ReceiptExtraction` segue o contrato de retorno 5.3 (`store`, `receipt`, `items`, com campos nulos quando não lidos) e acrescenta `isReceipt`/`unreadableReason`.
+- **`ClaudeReceiptReader`** — SDK oficial `Anthropic` 13.12.0, modelo `claude-opus-5-5` (configurável), imagem em base64 e **saída estruturada** (`output_config.format` com esquema JSON estrito); esforço `medium`; tempo limite configurável (180 s); 2 novas tentativas automáticas do SDK para 429/5xx; fallback do lado do servidor para recusas (`server-side-fallback-2026-07-01`, modo `default`). Erros do SDK traduzidos em categorias (`NotConfigured`, `InvalidImage`, `Unavailable`, `Timeout`, `InvalidResponse`, `Refused`) com mensagens em português; `stop_reason` `refusal`/`max_tokens` e JSON inválido tratados.
+- **Prompt** (`ReceiptExtractionPrompt`): transcrever somente o legível, nunca inventar, números como impressos, ignorar itens cancelados, `totalPrice` bruto da linha e desconto separado (o líquido é calculado no backend, em `decimal`).
+- **Sem chave** (`UnavailableReceiptReader`): a leitura informa a indisponibilidade; upload, conferência e cadastro manual continuam funcionando. Escolha do provedor por configuração (`ReceiptReader:Provider`).
+- **Importações** (`Services/Imports`):
+  - `POST /api/receipts/upload` valida e armazena a imagem, cria a `ReceiptImport` (`Pending`) e responde 202 com o identificador.
+  - A leitura roda em segundo plano (`Channel` + `BackgroundService`, uma por vez); na inicialização, leituras interrompidas voltam para a fila.
+  - Estados: `Pending → Processing → AwaitingReview | Failed`; depois `Confirmed` ou `Discarded`. Registra provedor, modelo, JSON retornado, erro, tentativas e data.
+- **Validação do resultado** (`ReceiptDraftBuilder`): CNPJ e chave de acesso validados (inválidos não são preenchidos e o alerta mostra o que foi lido), data no formato esperado, supermercado identificado pelo CNPJ, produtos sugeridos somente por descrição alternativa confirmada única, alertas de valores ausentes, casas decimais excedentes e consistência (RN10).
+- **Endpoints**: `GET /api/receipts/imports/reader` (disponibilidade), `GET /api/receipts/imports` (em aberto), `GET /api/receipts/imports/{id}` (status + rascunho), `GET .../image`, `POST .../reprocess`, `PUT .../discard`, `PUT .../confirm` e `GET /api/receipts/{id}/processing`.
+- **Confirmação** (`ReceiptService.CreateConfirmedFromImportAsync`): em uma única transação cria a nota já confirmada com a imagem da importação, itens, histórico de preços e descrições aprendidas, e vincula a importação. Com alertas e sem ciência → 409 e **nada é gravado**. Leitura com falha pode ser concluída manualmente com a mesma imagem.
+
+**Frontend**
+- **Nova compra**: cartão "Ler nota por foto" (JPEG/PNG/WebP até 5 MB, câmera no celular), aviso quando a leitura está indisponível e lista de leituras em aberto.
+- **Conferência** (`/receipts/imports/:importId`):
+  - Acompanha a leitura (consulta periódica sem sobreposição).
+  - Ao concluir, mostra a imagem ao lado do formulário de compra pré-preenchido, com alertas da leitura, campos não lidos destacados, produtos sugeridos ("confira") e ambiguidades sinalizadas. Oferece cadastrar o supermercado lido da nota já pré-preenchido.
+  - Confirma pelo mesmo diálogo de alertas da Fase 3.
+  - Em falha: "Tentar ler novamente", "Cadastrar manualmente com esta imagem" ou "Descartar".
+- O formulário de compra passou a usar *container queries* (adapta-se à largura disponível, inclusive na coluna da conferência).
+
 ## 4. Testes executados (2026-11-23)
 
 | Suíte | Resultado |
 |---|---|
-| Backend — `dotnet test` | **160 aprovados**, 0 falhas |
-| Frontend — `ng test` (Vitest) | **117 aprovados**, 0 falhas |
+| Backend — `dotnet test` | **199 aprovados**, 0 falhas |
+| Frontend — `ng test` (Vitest) | **134 aprovados**, 0 falhas |
 | Build de produção Angular | OK (inicial ≈ 792 kB, ≈ 167 kB transferidos) |
 | Verificação manual no navegador | Ver abaixo |
+| Chamada real à API da Anthropic | **Não executada** — não há chave configurada neste ambiente (seção 7) |
 
 **Backend — cobertura acumulada**
 - Fase 1: conversões escaladas, persistência com as migrations reais, integridade referencial, cascata, health check, CORS.
 - Fase 2: validadores (CNPJ numérico/alfanumérico, GTIN, UF, casas decimais), normalização de texto; serviços de categorias, supermercados e produtos (normalização, unicidade, busca, filtros, ordenação, paginação, curingas literais, indicadores só com compras confirmadas e somas exatas, bloqueio de exclusão, descrições alternativas); endpoints HTTP de ponta a ponta (201/204/400/404/409/422, erros por campo em camelCase, parâmetros de paginação inválidos, ordenação desconhecida, enum inválido).
 - Fase 3: chave de acesso (formato, DV, CNPJ); consistência dos valores (todos os alertas, tolerância de truncamento, desconto geral e acréscimos); serviço de compras (rascunho sem histórico, referências inválidas, chave duplicada, confirmação exige itens, alertas exigem ciência, possíveis duplicatas sem bloqueio e só no mesmo supermercado, histórico gerado só para itens associados, descrições aprendidas, edição preservando ids e ressincronizando o histórico, associação posterior, exclusão removendo histórico, indicadores do supermercado, filtros/período/ordenação, imagem); armazenamento de imagens (assinatura, vazio, tamanho, fluxo maior que o declarado, caminho fora do diretório); endpoints (fluxo completo com 409 de alertas, erros por item, upload multipart, rejeição de arquivo falso, imagem servida com `nosniff`); datas de auditoria em UTC.
+- Fase 4 (com leitor simulado, isolado no projeto de testes): esquema da saída estruturada (objetos estritos, nomes do contrato), interpretação da resposta (decimais exatos, recusa, `max_tokens`, vazio, JSON inválido), limite de 5 MB e formato antes de chamar a API, escolha do leitor por configuração; rascunho (supermercado por CNPJ, não cadastrado, CNPJ/chave/data inválidos sem preenchimento, valores ausentes, inconsistências, total líquido do item, sugestão única × ambígua, JSON ilegível); importações (upload e fila, leitura bem-sucedida sem registrar compra, cada tipo de falha, erro inesperado sem vazar detalhes, imagem que não é nota, processamento só de pendentes, reprocessamento, confirmação transacional com imagem e vínculo, alertas sem gravação, conclusão manual após falha, estados que impedem confirmar, descarte, status do leitor); ponta a ponta HTTP (enviar → processar em segundo plano → conferir → confirmar → compra com imagem e `processing`; sem leitor configurado; arquivo falso; importação inexistente).
 
 **Frontend — cobertura acumulada**
 - Fase 1: roteamento e títulos, `HealthService`, `toApiError`, indicador da API, layout, página provisória.
 - Fase 2: serviços HTTP (URLs, métodos, corpo e query string), helpers de formulário e utilitários, página de categorias (carregamento, tabela, vazio, erro + nova tentativa, exclusão com confirmação), página de supermercados (parâmetros, formatação de CNPJ/moeda/data, *debounce*, filtro, ordenação, paginação, erro), formulário de supermercado (obrigatórios, formato de CNPJ, nulos, erros do backend nos campos, 409, edição), formulário de produto (padrões, casas decimais, código de barras, payload, 409, erro geral), detalhes do produto (dados, descrições, adicionar, duplicidade, confirmar, 404).
 - Fase 3: arredondamento e total do item, mapeamento de caminhos de erro, formato da chave, adaptador de datas, serviço HTTP de compras (inclusive upload), fluxo de confirmação com alertas (aceitar, recusar, outros erros), `SearchPicker` (busca, seleção, limpeza ao digitar, cadastrar novo, desabilitado), listagem (ordenação padrão, filtro inicial por supermercado, situação, período, vazio, erro, exclusão), formulário (cálculos, divergência, sugestão única e ambígua, validação, data/hora sem fuso, rascunho, confirmação aceita e recusada com atualização na nova tentativa, erros nos itens, chave duplicada, imagem inválida e envio após salvar, edição preservando totais impressos, 404), detalhes (dados, alertas, itens não identificados, confirmação, remoção de imagem, 404).
+- Fase 4: serviço de importações, cartão de envio (upload e navegação, limite de 5 MB, formato, leitor indisponível, leituras em aberto), página de conferência (consulta periódica até concluir e parada, formulário pré-preenchido, falha com nova tentativa/cadastro manual/descarte, compra registrada, 404), formulário em modo conferência (pré-preenchimento com totais impressos e campos vazios, cadastro do supermercado lido, confirmação pela importação, recusa dos alertas, cadastro manual sem leitura, descarte), pré-preenchimento do cadastro de supermercado, `confirmWith`.
 
 **Verificação manual (navegador)**
 - Fase 2: listagem de categorias; cadastro de supermercado com CNPJ inválido (erro do backend exibido no campo) e depois válido; cadastro de produto com redirecionamento aos detalhes; inclusão de descrição alternativa e rejeição de equivalente com acento/caixa diferentes; paginador em português; layout a 375 px.
 - Fase 3: nova compra com seletor de supermercado por busca; descrição "leite int 1l" associada automaticamente ao produto; total do item e totais da nota calculados; total divergente digitado → aviso em tempo real → diálogo com o alerta do backend → confirmação; detalhes com alertas, item não identificado e imagem anexada; listagem filtrada por `?storeId=`; edição carregando a compra confirmada. Corrigido durante a verificação: horários de auditoria exibidos 3 h adiantados (datas UTC sem "Z").
-- Os registros e a imagem criados nas verificações foram excluídos do banco e da pasta de uploads locais.
+- Fase 4 (sem chave configurada): Nova compra informa que a leitura está indisponível; imagem enviada → leitura falha com a mensagem de configuração → "Cadastrar manualmente com esta imagem" → compra confirmada com a imagem e vínculo em `processing`. Corrigidos durante a verificação: texto duplicado no aviso, formulário espremido na coluna da conferência (passou a usar *container queries*) e totais automáticos desligados no cadastro manual após falha.
+- Os registros e as imagens criados nas verificações foram excluídos do banco e da pasta de uploads locais.
 
 ## 5. Decisões técnicas
 
@@ -131,7 +159,7 @@
 | D3 | **O conversor não arredonda silenciosamente**: valor com mais casas que a escala gera erro. Valores calculados devem ser arredondados com `DecimalPrecision.Round` (meio para longe do zero). Entradas da API são validadas antes (`DecimalPlaces`). | Evita perda de precisão invisível. |
 | D4 | **Agregações**: `SUM` em SQL é exato (inteiros). **Não usar `AVG` do SQLite**: calcular soma e contagem e dividir em `decimal`. | Especificação 6.4. Validado em teste. |
 | D5 | **`ReceiptImport`** com `Guid` próprio e estados `Pending → Processing → AwaitingReview / Failed → Confirmed / Discarded`; `ReceiptId` opcional; importação preservada se a nota for excluída. | Especificação 6.1 e seção 8. |
-| D6 | **Rotas de importação** (Fase 4): `POST /api/receipts/upload` → `importId`; `GET /api/receipts/imports/{importId}`; `PUT /api/receipts/imports/{importId}/confirm`; `GET /api/receipts/{id}/processing` lista as importações de uma nota confirmada. | A especificação pede o ajuste ao modelo de rascunho. |
+| D6 | **Rotas de importação**: `POST /api/receipts/upload` → 202 com o id; `GET /api/receipts/imports[/{id}]`; `GET .../image`; `POST .../reprocess`; `PUT .../discard`; `PUT .../confirm`; `GET /api/receipts/imports/reader`; `GET /api/receipts/{id}/processing`. | A especificação pede o ajuste ao modelo de rascunho. |
 | D7 | **Status da nota**: `Draft` e `Confirmed`; somente `Confirmed` participa de relatórios, dashboard, histórico e dos indicadores de supermercado (RN01, RN09). | Simplicidade. |
 | D8 | **Exclusão restritiva** (supermercado com notas, produto com itens/histórico, categoria com produtos), verificada no serviço (409 com mensagem clara) e garantida pela FK `RESTRICT`. Cascata: nota → itens → observação; produto → descrições. | Especificação 6.3 e RN05. |
 | D9 | **Unicidade**: CNPJ, chave de acesso e código de barras únicos quando informados; categoria única sem diferenciar maiúsculas (`NOCASE`); descrição alternativa única por produto (forma normalizada). | RN02, 4.3, 4.4. |
@@ -160,10 +188,18 @@
 | D32 | **Imagens nunca são apagadas pela aplicação**: remover/substituir a imagem ou excluir a nota apenas desvincula. O gerenciamento de arquivos órfãos fica para Configurações (Fase 7). | "Preservar imagens originais" (6.3); evita perda acidental. |
 | D33 | **Datas de auditoria lidas como UTC** por conversor no `AppDbContext` (`CreatedAt`, `UpdatedAt`, `ProcessedAt`). | Sem o "Z", o navegador exibia o horário UTC como local. |
 | D34 | **Chave de acesso com CNPJ alfanumérico**: posições 7–20 aceitam `[0-9A-Z]`; DV por módulo 11 com valor = ASCII − 48 (mesma regra do CNPJ alfanumérico). | Notas de emitentes com CNPJ alfanumérico. |
+| D35 | **Provedor: Anthropic (Claude), SDK oficial .NET**, modelo padrão `claude-opus-5-5`, esforço `medium`, configuráveis. Trocar de provedor = nova implementação de `IReceiptReader` + `ReceiptReaderFactory`. | Modelo multimodal atual com saída estruturada; SDK oficial em vez de HTTP manual. |
+| D36 | **Saída estruturada com esquema estrito** (todos os campos obrigatórios, nulos via `anyOf`) em vez de *tool use*. | Garante JSON válido no formato do contrato; *tool use* forçado não é aceito pelo modelo. |
+| D37 | **A IA só transcreve; o backend calcula e valida.** O total líquido do item (bruto − desconto) é calculado em `decimal`; CNPJ, chave, data e consistência são validados pelo backend; valores inválidos não são preenchidos. | "Não inventar dados" (5.3) e precisão monetária (6.4). |
+| D38 | **Leitura assíncrona em processo** (`Channel` + `BackgroundService`, uma leitura por vez, recuperação na inicialização) e consulta periódica no frontend. | Leituras podem levar dezenas de segundos; evita tempo esgotado do HTTP sem infraestrutura de filas (seção 3 da especificação). |
+| D39 | **Confirmação da importação cria a nota já confirmada em uma transação** (sem rascunho intermediário). Com alertas não aceitos, nada é gravado. | RN01 e "uma compra não poderá ficar parcialmente registrada". |
+| D40 | **Fallback do lado do servidor para recusas** (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`) habilitado. Para desativar, remova `Betas`/`Fallbacks` em `ClaudeReceiptReader.BuildRequest`. | Recomendação do provedor para o modelo; recusas indevidas não interrompem a leitura. |
+| D41 | **Limite de 5 MB para a leitura** (limite da API para imagens em base64), validado no frontend e no backend; o armazenamento continua aceitando até 10 MB. | Mensagem clara antes de gastar uma chamada. |
+| D42 | **Chave só no backend**: `ReceiptReader:ApiKey` (user-secrets) ou `ANTHROPIC_API_KEY`; nunca em appsettings versionado nem no Angular. `UserSecretsId` adicionado ao projeto da API. | Especificação 2.4 e seção 10. |
 
 ## 6. Funcionalidades pendentes
 
-- Fase 4: integração com IA (leitura da imagem, conferência, confirmação).
+- Fase 4: validar a leitura real com uma chave da Anthropic e fotos de notas reais (ajustar prompt/esforço se necessário).
 - Fases 5 a 7: conforme a tabela da seção 1.
 
 ## 7. Problemas conhecidos
@@ -176,8 +212,11 @@
 - A API ainda não tem autenticação (D12).
 - Imagens desvinculadas ou de notas excluídas permanecem em `uploads/` (D32) até existir o gerenciamento de imagens (Fase 7).
 - Os campos numéricos usam `<input type="number">`: o separador decimal exibido depende do navegador (ponto ou vírgula).
+- **A leitura real pela API da Anthropic ainda não foi executada**: não há chave neste ambiente. A integração foi escrita com o SDK oficial e compila; o tratamento de respostas, erros e o fluxo completo foram testados com um leitor simulado. Com a chave configurada (README → "Leitura de notas por IA"), validar com fotos reais.
+- Fotos HEIC (padrão do iPhone) não são aceitas; o usuário precisa enviar JPEG/PNG/WebP. Fotos acima de 5 MB precisam ser reduzidas antes do envio.
+- A fila de leitura é em memória e processa uma imagem por vez; adequada ao uso pessoal.
 
-## 8. Próxima etapa — Fase 4 (Inteligência artificial)
+## 8. Próxima etapa — Fase 5 (Histórico de preços)
 
-1. Backend: `IReceiptReader` e `ReceiptExtractionResult` (contrato da seção 5.3, campos ausentes como nulos); implementação de um provedor multimodal configurável, com chave só no backend; `POST /api/receipts/upload` criando a `ReceiptImport` (imagem validada e armazenada, estado próprio); processamento com tratamento de imagem ilegível, timeout, JSON inválido e dados incompletos; validação do resultado (CNPJ, chave, totais) e identificação do supermercado (`FindByCnpjAsync`) e dos produtos (`match`); `GET /api/receipts/imports/{importId}`, reprocessamento e descarte; confirmação criando a nota em transação pelo mesmo fluxo da Fase 3; sem chave configurada, o upload informa que a leitura está indisponível e o cadastro manual segue funcionando; testes com leitor falso isolado nos testes.
-2. Frontend: envio da foto em "Nova compra", acompanhamento do processamento, tela de conferência reutilizando o formulário de compra pré-preenchido, confirmação; testes.
+1. Backend: preço normalizado (por kg, litro ou unidade) a partir da unidade e do conteúdo da embalagem do produto (RN08), com conversões G→KG, ML→L, DZ→12 UN e arredondamento explícito; recálculo das observações existentes (D30); `GET /api/products/{id}/prices` (histórico, último, menor, maior e médio preço, variação percentual — médias em `decimal`, D4) e `GET /api/products/{id}/comparison` (por supermercado, somente unidades compatíveis — RN07); testes.
+2. Frontend: instalar Apache ECharts; tela Histórico de preços (busca de produto, gráfico de linhas, indicadores) e comparação entre supermercados; seção de histórico nos detalhes do produto; testes.

@@ -1,7 +1,9 @@
-<a mat-button [routerLink]="isEdit() ? ['/receipts', id()] : ['/receipts']" class="back-link">
-  <mat-icon>arrow_back</mat-icon>
-  {{ isEdit() ? 'Voltar à compra' : 'Notas fiscais' }}
-</a>
+@if (!isImport()) {
+  <a mat-button [routerLink]="isEdit() ? ['/receipts', id()] : ['/receipts']" class="back-link">
+    <mat-icon>arrow_back</mat-icon>
+    {{ isEdit() ? 'Voltar à compra' : 'Notas fiscais' }}
+  </a>
+}
 
 @if (loading()) {
   <mat-progress-bar mode="indeterminate" />
@@ -13,6 +15,27 @@
   </mat-card>
 } @else {
   <form [formGroup]="form" (ngSubmit)="save(false)" novalidate class="receipt-form">
+    @if (!isEdit() && !isImport()) {
+      <app-receipt-import-card />
+      <h2 class="manual-title">Ou cadastre manualmente</h2>
+    }
+
+    @if (isImport()) {
+      <div class="info-banner info-banner--column" role="note">
+        <p class="info-banner__title">
+          <mat-icon>fact_check</mat-icon>
+          Confira cada campo com a imagem da nota. A compra só será registrada quando você confirmar.
+        </p>
+        @if (draftWarnings().length) {
+          <ul class="draft-warnings">
+            @for (warning of draftWarnings(); track $index) {
+              <li>{{ warning.message }}</li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
     @if (isEdit() && status() === 'Confirmed') {
       <p class="info-banner" role="note">
         <mat-icon>info</mat-icon>
@@ -36,6 +59,14 @@
             createLabel="Cadastrar novo supermercado"
             (create)="createStore()"
           />
+          @if (unregisteredStore(); as read) {
+            @if (!form.controls.store.value) {
+              <button mat-stroked-button type="button" class="register-store" (click)="createStore()">
+                <mat-icon>add_business</mat-icon>
+                Cadastrar "{{ read.extractedStoreName ?? 'supermercado' }}" lido da nota
+              </button>
+            }
+          }
         </div>
 
         <mat-form-field>
@@ -166,7 +197,7 @@
       </mat-card-content>
     </mat-card>
 
-    <div class="bottom-grid">
+    <div class="bottom-grid" [class.bottom-grid--single]="isImport()">
       <mat-card appearance="outlined">
         <mat-card-header>
           <mat-card-title>Totais</mat-card-title>
@@ -220,6 +251,7 @@
         </mat-card-content>
       </mat-card>
 
+      @if (!isImport()) {
       <mat-card appearance="outlined">
         <mat-card-header>
           <mat-card-title>Imagem da nota</mat-card-title>
@@ -247,6 +279,7 @@
           }
         </mat-card-content>
       </mat-card>
+      }
     </div>
 
     @if (formError()) {
@@ -254,6 +287,13 @@
     }
 
     <div class="form-actions">
+      @if (isImport()) {
+        <button mat-button type="button" [disabled]="saving()" (click)="discardImport()">Descartar leitura</button>
+        <button mat-flat-button type="button" [disabled]="saving()" (click)="save(true)">
+          <mat-icon>task_alt</mat-icon>
+          {{ saving() ? 'Registrando…' : 'Confirmar compra' }}
+        </button>
+      } @else {
       <a mat-button [routerLink]="isEdit() ? ['/receipts', id()] : ['/receipts']">Cancelar</a>
       @if (status() === 'Draft') {
         <button mat-stroked-button type="submit" [disabled]="saving()">Salvar rascunho</button>
@@ -263,6 +303,7 @@
         </button>
       } @else {
         <button mat-flat-button type="submit" [disabled]="saving()">{{ saving() ? 'Salvando…' : 'Salvar alterações' }}</button>
+      }
       }
     </div>
   </form>

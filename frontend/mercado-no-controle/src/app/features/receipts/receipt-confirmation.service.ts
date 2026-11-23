@@ -17,7 +17,15 @@ export class ReceiptConfirmationService {
   private readonly datePipe = new DatePipe(inject(LOCALE_ID));
 
   confirm(receiptId: number): Observable<Receipt | null> {
-    return this.receipts.confirm(receiptId, false).pipe(
+    return this.confirmWith((acknowledge) => this.receipts.confirm(receiptId, acknowledge));
+  }
+
+  /**
+   * Mesmo fluxo para qualquer operação de confirmação (ex.: confirmar uma importação):
+   * `send(false)` primeiro; havendo alertas e aceite do usuário, `send(true)`.
+   */
+  confirmWith(send: (acknowledgeWarnings: boolean) => Observable<Receipt>): Observable<Receipt | null> {
+    return send(false).pipe(
       catchError((error: unknown) => {
         const apiError = toApiError(error);
         const warnings = (apiError.problem?.['warnings'] as ReceiptWarning[] | undefined) ?? [];
@@ -33,7 +41,7 @@ export class ReceiptConfirmationService {
             details: [...warnings.map((w) => w.message), ...duplicates.map((d) => this.describeDuplicate(d))],
             confirmLabel: 'Confirmar mesmo assim',
           })
-          .pipe(switchMap((accepted) => (accepted ? this.receipts.confirm(receiptId, true) : of(null))));
+          .pipe(switchMap((accepted) => (accepted ? send(true) : of(null))));
       }),
     );
   }

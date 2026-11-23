@@ -27,7 +27,9 @@ import {
 } from '../../shared/forms/form-errors';
 import { ProductsService, formatPackage } from '../products/products.service';
 import { ProductRef, ReceiptPickers, StoreRef, productDescription, productName, storeDescription, storeName } from './pickers';
+import { ImportsService, ReceiptDraft } from './imports.service';
 import { ReceiptConfirmationService } from './receipt-confirmation.service';
+import { ReceiptImportCard } from './receipt-import-card';
 import {
   Receipt,
   ReceiptItem,
@@ -73,6 +75,7 @@ const FIELD_ALIASES = { storeId: 'store', issuedAt: 'issuedDate', productId: 'pr
     MatProgressBarModule,
     MatTooltipModule,
     EmptyState,
+    ReceiptImportCard,
     SearchPicker,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -84,6 +87,7 @@ export class ReceiptFormPage implements OnInit {
   private readonly service = inject(ReceiptsService);
   private readonly productsService = inject(ProductsService);
   private readonly confirmation = inject(ReceiptConfirmationService);
+  private readonly importsService = inject(ImportsService);
   private readonly notification = inject(NotificationService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -91,6 +95,16 @@ export class ReceiptFormPage implements OnInit {
 
   /** Parâmetro de rota `:id` (edição). */
   readonly id = input<string>();
+
+  /** Conferência de importação: identificador e dados lidos pela IA (quando houver). */
+  readonly importId = input<string>();
+  readonly draft = input<ReceiptDraft | null>(null);
+  protected readonly isImport = computed(() => !!this.importId());
+  protected readonly draftWarnings = computed(() => this.draft()?.warnings ?? []);
+  protected readonly unregisteredStore = computed(() => {
+    const draft = this.draft();
+    return draft && !draft.storeId && (draft.extractedStoreName || draft.extractedCnpj) ? draft : null;
+  });
 
   protected readonly storeName = storeName;
   protected readonly storeDescription = storeDescription;
@@ -159,7 +173,9 @@ export class ReceiptFormPage implements OnInit {
 
   ngOnInit(): void {
     const id = Number(this.id());
-    if (id > 0) {
+    if (this.isImport()) {
+      this.patchFromDraft(this.draft());
+    } else if (id > 0) {
       this.load(id);
     } else {
       this.form.controls.issuedDate.setValue(new Date());
@@ -167,7 +183,7 @@ export class ReceiptFormPage implements OnInit {
     }
   }
 
-  addItem(item?: ReceiptItem): void {
+  addItem(item?: Partial<ReceiptItem>, hint: string | null = null): void {
     const group: ItemForm = this.fb.group({
       id: new FormControl<number | null>(item?.id ?? null),
       description: this.fb.control(item?.description ?? '', [Validators.required, Validators.maxLength(250)]),
@@ -187,7 +203,7 @@ export class ReceiptFormPage implements OnInit {
       ]),
       discount: new FormControl<number | null>(item?.discount ?? 0, [Validators.min(0), maxDecimalPlaces(2)]),
       total: new FormControl<number | null>(item?.total ?? null, [Validators.required, Validators.min(0), maxDecimalPlaces(2)]),
-      hint: new FormControl<string | null>(null),
+      hint: new FormControl<string | null>(hint),
     });
     this.watchItem(group);
     this.items.push(group);
@@ -231,7 +247,26 @@ export class ReceiptFormPage implements OnInit {
   }
 
   createStore(): void {
-    this.pickers.createStore().subscribe((store) => this.form.controls.store.setValue(store));
+    const fromReceipt = this.unregisteredStore();
+    const prefill = fromReceipt ? { tradeName: fromReceipt.extractedStoreName, cnpj: fromReceipt.extractedCnpj } : undefined;
+    this.pickers.createStore(prefill).subscribe((store) => this.form.controls.store.setValue(store));
+  }
+
+  /** Descarta a importação em conferência, sem registrar compra. */
+  discardImport(): void {
+    const importId = this.importId();
+    if (!importId) return;
+    this.saving.set(true);
+    this.importsService.discard(importId).subscribe({
+      next: () => {
+        this.notification.success('Leitura descartada.');
+        void this.router.navigate(['/receipts/new']);
+      },
+      error: (error: unknown) => {
+        this.saving.set(false);
+        this.notification.error(toApiError(error).message);
+      },
+    });
   }
 
   /** Preenche os totais da nota a partir dos itens. */
@@ -282,6 +317,12 @@ export class ReceiptFormPage implements OnInit {
     }
 
     const request = this.buildRequest();
+    const importId = this.importId();
+    if (importId) {
+      this.confirmImport(importId, request);
+      return;
+    }
+
     const existingId = this.savedId();
     const save$: Observable<Receipt> = existingId ? this.service.update(existingId, request) : this.service.create(request);
 
@@ -309,6 +350,76 @@ export class ReceiptFormPage implements OnInit {
         },
         error: (error: unknown) => this.handleSaveError(error),
       });
+  }
+
+  /** Registra a compra a partir da importação; nada é gravado se o usuário recusar os alertas. */
+  private confirmImport(importId: string, request: ReceiptRequest): void {
+    this.saving.set(true);
+    this.confirmation
+      .confirmWith((acknowledge) => this.importsService.confirm(importId, request, acknowledge))
+      .subscribe({
+        next: (receipt) => {
+          this.saving.set(false);
+          if (receipt) {
+            this.notification.success('Compra confirmada e registrada.');
+            void this.router.navigate(['/receipts', receipt.id]);
+          }
+        },
+        error: (error: unknown) => this.handleSaveError(error),
+      });
+  }
+
+  /** Preenche o formulário com o que a IA leu. Campos não lidos ficam vazios para o usuário completar. */
+  private patchFromDraft(draft: ReceiptDraft | null): void {
+    this.items.clear({ emitEvent: false });
+    if (!draft) {
+      // Nada foi lido: cadastro manual comum, com totais calculados pelos itens.
+      this.form.controls.issuedDate.setValue(new Date());
+      this.addItem();
+      return;
+    }
+
+    // Valores impressos lidos da nota são preservados; o cálculo automático fica desligado.
+    this.form.controls.autoTotals.setValue(false);
+    for (const item of draft.items) {
+      const hint = item.productId
+        ? 'Associado pela descrição — confira.'
+        : item.matchCount > 1
+          ? `Esta descrição está associada a ${item.matchCount} produtos — escolha o correto.`
+          : null;
+      this.addItem(
+        {
+          description: item.description,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity ?? undefined,
+          unit: item.unit,
+          unitPrice: item.unitPrice ?? undefined,
+          discount: item.discount ?? 0,
+          total: item.total ?? undefined,
+        },
+        hint,
+      );
+    }
+    if (draft.items.length === 0) {
+      this.addItem();
+    }
+
+    this.form.patchValue({
+      store: draft.storeId ? { id: draft.storeId, tradeName: draft.storeName ?? '' } : null,
+      issuedDate: draft.issuedAt ? fromIsoDate(draft.issuedAt) : null,
+      issuedTime: draft.issuedAt && draft.issuedAt.length >= 16 ? draft.issuedAt.slice(11, 16) : '12:00',
+      number: draft.number ?? '',
+      series: draft.series ?? '',
+      accessKey: draft.accessKey ?? '',
+      paymentMethod: draft.paymentMethod ?? '',
+      productsTotal: draft.productsTotal,
+      discountTotal: draft.discountTotal,
+      additionalCharges: draft.additionalCharges ?? 0,
+      total: draft.total,
+    });
+    // Destaca de imediato o que precisa ser preenchido.
+    this.form.markAllAsTouched();
   }
 
   private load(id: number): void {

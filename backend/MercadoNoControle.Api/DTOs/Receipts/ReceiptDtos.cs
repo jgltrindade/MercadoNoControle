@@ -43,7 +43,7 @@ public sealed class ReceiptItemRequest
 }
 
 /// <summary>Dados gerais da nota como impressos, mais os itens.</summary>
-public sealed class ReceiptRequest
+public class ReceiptRequest
 {
     [Required(ErrorMessage = "Informe o supermercado.")]
     public int? StoreId { get; set; }

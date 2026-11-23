@@ -29,6 +29,13 @@ public interface IReceiptService
     Task<ReceiptResponse> RemoveImageAsync(int id, CancellationToken cancellationToken);
 
     Task<(Stream Content, string ContentType)> OpenImageAsync(int id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Cria a compra já confirmada a partir de uma importação conferida pelo usuário, em uma única
+    /// transação (nota, itens, histórico de preços, descrições aprendidas e vínculo da importação).
+    /// </summary>
+    Task<ReceiptResponse> CreateConfirmedFromImportAsync(
+        ReceiptImport import, ReceiptRequest request, bool acknowledgeWarnings, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -194,6 +201,49 @@ public sealed class ReceiptService(
         }
 
         return await GetAsync(id, cancellationToken);
+    }
+
+    public async Task<ReceiptResponse> CreateConfirmedFromImportAsync(
+        ReceiptImport import, ReceiptRequest request, bool acknowledgeWarnings, CancellationToken cancellationToken)
+    {
+        int receiptId;
+        await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
+        {
+            var receipt = new Receipt { Status = ReceiptStatus.Draft, CreatedAt = Now(), ImagePath = import.ImagePath };
+            await ApplyAsync(receipt, request, cancellationToken);
+            if (receipt.Items.Count == 0)
+            {
+                throw NoItemsError();
+            }
+
+            receipt.Store = await db.Stores.SingleAsync(s => s.Id == receipt.StoreId, cancellationToken);
+            var warnings = ReceiptConsistency.Check(receipt, receipt.Store.Cnpj);
+            var duplicates = await FindPossibleDuplicatesAsync(receipt, cancellationToken);
+            if ((warnings.Count > 0 || duplicates.Count > 0) && !acknowledgeWarnings)
+            {
+                // Nada foi gravado: a compra só é registrada após a ciência do usuário.
+                throw new ConflictException(
+                    "A nota possui alertas. Revise-os e confirme novamente para registrar a compra.",
+                    new Dictionary<string, object?>
+                    {
+                        ["warnings"] = warnings,
+                        ["possibleDuplicates"] = duplicates
+                    });
+            }
+
+            receipt.Status = ReceiptStatus.Confirmed;
+            db.Receipts.Add(receipt);
+            import.Receipt = receipt;
+            import.Status = ReceiptImportStatus.Confirmed;
+            await LearnAliasesAsync(receipt, cancellationToken);
+            priceRecorder.Sync(receipt, Now());
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            receiptId = receipt.Id;
+        }
+
+        return await GetAsync(receiptId, cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken)

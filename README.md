@@ -73,7 +73,29 @@ npx ng test --watch=false
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0` | `http://localhost:4200` |
 | `Uploads:MaxImageSizeBytes` | `Uploads__MaxImageSizeBytes` | `10485760` (10 MB) |
 
-Caminhos relativos são resolvidos a partir do diretório do projeto da API. Chaves de API (provedor de IA, Fase 4) serão configuradas somente no backend, por variável de ambiente ou *user-secrets* — nunca no Angular nem em arquivos versionados.
+Caminhos relativos são resolvidos a partir do diretório do projeto da API.
+
+## Leitura de notas por IA
+
+A leitura automática usa a API da Anthropic (Claude, modelo `claude-opus-5-5` por padrão) por meio da interface `IReceiptReader`. **Sem chave configurada, o sistema funciona normalmente com o cadastro manual** e a tela "Nova compra" informa que a leitura está indisponível.
+
+A chave fica **somente no backend** — nunca no Angular nem em arquivos versionados. Em desenvolvimento, use *user-secrets*:
+
+```powershell
+cd backend/MercadoNoControle.Api
+dotnet user-secrets set "ReceiptReader:ApiKey" "<sua-chave>"
+```
+
+Alternativas: variável de ambiente `ANTHROPIC_API_KEY` ou `ReceiptReader__ApiKey`. Reinicie a API depois de configurar.
+
+| Chave (`appsettings.json`) | Padrão | Descrição |
+|---|---|---|
+| `ReceiptReader:Provider` | `Anthropic` | `None` desativa a leitura automática |
+| `ReceiptReader:Model` | `claude-opus-5-5` | Modelo usado na leitura |
+| `ReceiptReader:Effort` | `medium` | `low`, `medium`, `high`, `xhigh` ou `max` |
+| `ReceiptReader:TimeoutSeconds` | `180` | Tempo máximo de uma leitura |
+
+Cada leitura é cobrada pela Anthropic conforme o uso de tokens. Imagens acima de 5 MB não são aceitas pela leitura automática.
 
 ## Migrations
 

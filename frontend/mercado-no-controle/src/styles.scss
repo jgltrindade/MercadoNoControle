@@ -214,3 +214,15 @@ body {
 .filters__period {
   flex: 0 1 260px;
 }
+
+.info-banner--column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.info-banner__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}

@@ -12,6 +12,11 @@ export const RECEIPTS_ROUTES: Routes = [
     loadComponent: () => import('./receipt-form-page').then((m) => m.ReceiptFormPage),
   },
   {
+    path: 'imports/:importId',
+    title: 'Conferência da nota',
+    loadComponent: () => import('./import-review-page').then((m) => m.ImportReviewPage),
+  },
+  {
     path: ':id',
     title: 'Detalhes da compra',
     loadComponent: () => import('./receipt-details-page').then((m) => m.ReceiptDetailsPage),

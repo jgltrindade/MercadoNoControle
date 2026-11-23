@@ -1,0 +1,89 @@
+<a mat-button routerLink="/receipts/new" class="back-link">
+  <mat-icon>arrow_back</mat-icon>
+  Nova compra
+</a>
+
+@if (loadError(); as error) {
+  <mat-card appearance="outlined">
+    @if (error.status === 404) {
+      <app-empty-state icon="search_off" title="Leitura não encontrada" message="A importação pode ter sido removida.">
+        <a mat-flat-button routerLink="/receipts/new">Nova compra</a>
+      </app-empty-state>
+    } @else {
+      <app-empty-state icon="error" title="Não foi possível consultar a leitura" [message]="error.message">
+        <a mat-stroked-button routerLink="/receipts/new">Voltar</a>
+      </app-empty-state>
+    }
+  </mat-card>
+} @else {
+  <div class="review" [class.review--form]="current()?.status === 'AwaitingReview' || manualEntry()">
+    <mat-card appearance="outlined" class="review__image">
+      <mat-card-header>
+        <mat-card-title>Imagem enviada</mat-card-title>
+        <mat-card-subtitle>
+          {{ current()?.originalFileName ?? '' }}
+          @if (current(); as item) {
+            · {{ item.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <a [href]="imageUrl()" target="_blank" rel="noopener" title="Abrir em tamanho original">
+          <img [src]="imageUrl()" alt="Fotografia da nota fiscal enviada" class="receipt-photo" />
+        </a>
+      </mat-card-content>
+    </mat-card>
+
+    <div class="review__main">
+      @if (inProgress()) {
+        <mat-card appearance="outlined" class="status-card" role="status" aria-live="polite">
+          <mat-spinner diameter="48" />
+          <h2>{{ statusLabel() || 'Carregando…' }}</h2>
+          <p class="muted">A leitura pode levar até um ou dois minutos. Você pode sair desta tela e voltar depois pela tela Nova compra.</p>
+        </mat-card>
+      } @else if (current(); as item) {
+        @switch (item.status) {
+          @case ('AwaitingReview') {
+            <app-receipt-form-page [importId]="item.id" [draft]="item.draft" />
+          }
+          @case ('Failed') {
+            @if (manualEntry()) {
+              <app-receipt-form-page [importId]="item.id" [draft]="item.draft" />
+            } @else {
+              <mat-card appearance="outlined" class="status-card">
+                <mat-icon class="status-card__icon status-card__icon--error">error</mat-icon>
+                <h2>Não foi possível ler a nota</h2>
+                <p>{{ item.error }}</p>
+                <div class="status-card__actions">
+                  <button mat-button type="button" [disabled]="busy()" (click)="discard()">Descartar</button>
+                  <button mat-stroked-button type="button" [disabled]="busy()" (click)="reprocess()">
+                    <mat-icon>refresh</mat-icon>
+                    Tentar ler novamente
+                  </button>
+                  <button mat-flat-button type="button" (click)="manualEntry.set(true)">
+                    <mat-icon>edit_note</mat-icon>
+                    Cadastrar manualmente com esta imagem
+                  </button>
+                </div>
+              </mat-card>
+            }
+          }
+          @case ('Confirmed') {
+            <mat-card appearance="outlined" class="status-card">
+              <mat-icon class="status-card__icon">task_alt</mat-icon>
+              <h2>Compra registrada</h2>
+              <a mat-flat-button [routerLink]="['/receipts', item.receiptId]">Ver compra</a>
+            </mat-card>
+          }
+          @case ('Discarded') {
+            <mat-card appearance="outlined" class="status-card">
+              <mat-icon class="status-card__icon">delete</mat-icon>
+              <h2>Leitura descartada</h2>
+              <a mat-stroked-button routerLink="/receipts/new">Nova compra</a>
+            </mat-card>
+          }
+        }
+      }
+    </div>
+  </div>
+}

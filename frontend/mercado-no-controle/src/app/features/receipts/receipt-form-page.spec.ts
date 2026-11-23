@@ -73,7 +73,11 @@ describe('ReceiptFormPage', () => {
     await settle();
   }
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // O cartão de leitura por foto (Nova compra) consulta o leitor e as importações em aberto.
+    http.match((req) => req.url.startsWith('/api/receipts/imports'));
+    http.verify();
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = () => fixture.componentInstance as any;

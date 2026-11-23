@@ -4,7 +4,7 @@ import { Observable, filter, map } from 'rxjs';
 import { formatCnpj } from '../../shared/pipes/cnpj.pipe';
 import { ProductFormDialog } from '../products/product-form-dialog';
 import { Product, ProductsService, formatPackage } from '../products/products.service';
-import { StoreFormDialog } from '../supermarkets/store-form-dialog';
+import { StoreFormData, StoreFormDialog } from '../supermarkets/store-form-dialog';
 import { Store, StoresService } from '../supermarkets/stores.service';
 
 /** Referência mínima a um supermercado em seletores. */
@@ -51,10 +51,13 @@ export class ReceiptPickers {
         ),
       );
 
-  /** Abre o cadastro de supermercado e emite o supermercado criado. */
-  createStore(): Observable<StoreRef> {
+  /** Abre o cadastro de supermercado (opcionalmente pré-preenchido) e emite o supermercado criado. */
+  createStore(prefill?: { tradeName?: string | null; cnpj?: string | null }): Observable<StoreRef> {
+    const data: StoreFormData = prefill
+      ? { prefill: { tradeName: prefill.tradeName ?? undefined, cnpj: prefill.cnpj ?? null } }
+      : null;
     return this.dialog
-      .open(StoreFormDialog, { data: null, width: '640px' })
+      .open(StoreFormDialog, { data, width: '640px' })
       .afterClosed()
       .pipe(filter((store): store is Store => !!store), map(toStoreRef));
   }
