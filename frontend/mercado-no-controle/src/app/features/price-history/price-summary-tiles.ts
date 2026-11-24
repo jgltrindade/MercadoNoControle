@@ -43,7 +43,7 @@ interface Tile {
   `,
   styles: `
     .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-    .tile { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border-radius: 12px; background: var(--mat-sys-surface-container-low); }
+    .tile { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border-radius: var(--app-radius); background: var(--mat-sys-surface-container-low); }
     .tile__label { font: var(--mat-sys-label-medium); color: var(--mat-sys-on-surface-variant); }
     .tile__value { font: var(--mat-sys-headline-small); color: var(--mat-sys-on-surface); }
     .tile__value--variation { display: flex; align-items: center; gap: 4px; }

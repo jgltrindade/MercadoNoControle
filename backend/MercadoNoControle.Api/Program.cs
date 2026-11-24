@@ -46,6 +46,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<IBackupService, BackupService>();
+builder.Services.AddScoped<MercadoNoControle.Api.Services.Demo.DemoDataSeeder>();
 
 // QuestPDF: licença Community (uso pessoal / receita anual inferior a US$ 1 milhão).
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
@@ -83,6 +84,24 @@ builder.Services.AddCors(options => options.AddPolicy(FrontendCorsPolicy, policy
 var app = builder.Build();
 
 await app.MigrateDatabaseAsync();
+
+// Dados fictícios para demonstração (executa e encerra, sem subir o servidor):
+//   dotnet run --project MercadoNoControle.Api -- --seed-demo   |   -- --remove-demo
+if (args.Contains("--seed-demo") || args.Contains("--remove-demo"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<MercadoNoControle.Api.Services.Demo.DemoDataSeeder>();
+    if (args.Contains("--remove-demo"))
+    {
+        await seeder.RemoveAsync();
+    }
+    else
+    {
+        await seeder.SeedAsync();
+    }
+
+    return;
+}
 
 if (app.Configuration.GetValue<bool>("ReverseProxy:Enabled"))
 {

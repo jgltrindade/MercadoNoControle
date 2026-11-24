@@ -1,3 +1,5 @@
+@use '@angular/material' as mat;
+
 :host {
   display: block;
   height: 100%;
@@ -5,12 +7,24 @@
 
 .shell {
   height: 100%;
+
+  // Barra lateral reta, com fundo levemente diferente e borda separando-a do conteúdo.
+  @include mat.sidenav-overrides(
+    (
+      container-shape: 0,
+      container-divider-color: var(--mat-sys-outline-variant),
+      container-background-color: var(--mat-sys-surface-container-low),
+    )
+  );
 }
 
 .shell__sidenav {
+  box-sizing: border-box;
   width: 260px;
-  border-right: 1px solid var(--mat-sys-outline-variant);
-  background: var(--mat-sys-surface-container-low);
+  padding: 0 12px;
+
+  // Itens do menu sem cantos arredondados (o indicador do item ativo também).
+  @include mat.list-overrides((active-indicator-shape: 0));
 }
 
 .shell__brand {
@@ -18,7 +32,8 @@
   align-items: center;
   gap: 12px;
   height: 64px;
-  padding: 0 20px;
+  // Alinha o ícone da marca com os ícones dos itens do menu (16px de recuo interno do item).
+  padding: 0 16px;
   font: var(--mat-sys-title-medium);
   color: var(--mat-sys-primary);
   text-decoration: none;

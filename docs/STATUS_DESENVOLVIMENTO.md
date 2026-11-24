@@ -403,6 +403,7 @@
 | D61 | **Interface publicada pela própria API** (mesma origem), com CSP `script-src 'self'` e *critical CSS* inline desativado no build. | Um processo só, sem CORS; a CSP impede scripts injetados. |
 | D62 | **Preferências de exibição no navegador** (`localStorage`): período padrão e itens por página. | São preferências do dispositivo, não dados da aplicação; sem tabela nem endpoint. |
 | D63 | **Docker opcional** (compose com porta só em `127.0.0.1` e cadastro remoto liberado por isso). | Especificação 2.5: Docker não é obrigatório para execução local. |
+| D64 | **Dados fictícios por linha de comando** (`--seed-demo` / `--remove-demo`), gerados pelos serviços da aplicação, de forma determinística, e marcados nas observações dos supermercados. A remoção preserva produtos cadastrados antes da geração. | Demonstração e testes pessoais com dados coerentes, sem tela nem endpoint que permita apagar dados pela rede. |
 
 ## 6. Funcionalidades pendentes
 

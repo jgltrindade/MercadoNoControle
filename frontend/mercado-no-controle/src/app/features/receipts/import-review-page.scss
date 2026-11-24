@@ -23,7 +23,7 @@
   max-width: 100%;
   max-height: calc(100vh - 220px);
   margin: 0 auto;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   border: 1px solid var(--mat-sys-outline-variant);
 }
 

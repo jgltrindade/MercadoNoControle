@@ -57,6 +57,30 @@ MercadoNoControle/
 
 3. **Primeiro acesso.** A aplicação pede o cadastro do usuário (nome, e-mail e senha de no mínimo 8 caracteres) e já entra. Nos acessos seguintes, entre com o e-mail e a senha. Veja [Acesso e segurança](#acesso-e-segurança).
 
+## Dados fictícios para testes
+
+Para experimentar a aplicação sem digitar compras, gere dados fictícios. São criados:
+
+- 4 supermercados (marcados como fictícios nas observações);
+- cerca de 30 produtos em todas as categorias;
+- seis meses de compras, com preços que variam por loja e sobem com o tempo, promoções ocasionais, alguns itens sem produto associado e um rascunho.
+
+Tudo passa pelas mesmas regras do cadastro: histórico de preços, dashboard e relatórios ficam coerentes. Pare a API antes (Ctrl+C), porque o `dotnet run` recompila o projeto:
+
+```powershell
+cd backend
+dotnet run --project MercadoNoControle.Api --launch-profile http -- --seed-demo
+```
+
+Para **remover** os dados fictícios antes do uso real (compras, supermercados e os produtos criados pela geração; seus cadastros são preservados):
+
+```powershell
+cd backend
+dotnet run --project MercadoNoControle.Api --launch-profile http -- --remove-demo
+```
+
+Os comandos executam e encerram, sem iniciar o servidor. Rodar `--seed-demo` de novo não duplica os dados.
+
 ## Testes
 
 ```powershell
